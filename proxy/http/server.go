@@ -11,7 +11,6 @@ import (
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/pool"
 	"github.com/nadoo/glider/proxy"
-	"github.com/nadoo/glider/stats"
 )
 
 // NewHTTPServer returns a http proxy server.
@@ -106,8 +105,6 @@ func (s *HTTP) servHTTPS(r *request, c net.Conn) {
 }
 
 func (s *HTTP) servHTTP(req *request, c *proxy.Conn) {
-	sourceIP := stats.SourceIP(c.RemoteAddr())
-
 	rc, dialer, err := s.proxy.Dial("tcp", req.target)
 	if err != nil {
 		fmt.Fprintf(c, "%s 502 ERROR\r\n\r\n", req.proto)
@@ -121,10 +118,7 @@ func (s *HTTP) servHTTP(req *request, c *proxy.Conn) {
 
 	// send request to remote server
 	req.WriteBuf(buf)
-	written, err := rc.Write(buf.Bytes())
-	if sourceIP != "" && written > 0 {
-		stats.AddUpload(sourceIP, written)
-	}
+	_, err = rc.Write(buf.Bytes())
 	if err != nil {
 		return
 	}
@@ -132,13 +126,7 @@ func (s *HTTP) servHTTP(req *request, c *proxy.Conn) {
 	// copy the left request bytes to remote server. eg. length specificed or chunked body.
 	go func() {
 		if _, err := c.Reader().Peek(1); err == nil {
-			if sourceIP == "" {
-				proxy.Copy(rc, c)
-			} else {
-				proxy.CopyWithObserver(rc, c, func(written int) {
-					stats.AddUpload(sourceIP, written)
-				})
-			}
+			proxy.Copy(rc, c)
 			rc.SetDeadline(time.Now())
 			c.SetDeadline(time.Now())
 		}
@@ -172,20 +160,7 @@ func (s *HTTP) servHTTP(req *request, c *proxy.Conn) {
 	writeHeaders(buf, header)
 
 	log.F("[http] %s <-> %s via %s", c.RemoteAddr(), req.target, dialer.Addr())
-	written, err = c.Write(buf.Bytes())
-	if sourceIP != "" && written > 0 {
-		stats.AddDownload(sourceIP, written)
-	}
-	if err != nil {
-		return
-	}
+	c.Write(buf.Bytes())
 
-	if sourceIP == "" {
-		proxy.Copy(c, r)
-		return
-	}
-
-	proxy.CopyWithObserver(c, r, func(written int) {
-		stats.AddDownload(sourceIP, written)
-	})
+	proxy.Copy(c, r)
 }

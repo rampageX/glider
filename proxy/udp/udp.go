@@ -9,7 +9,6 @@ import (
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/pool"
 	"github.com/nadoo/glider/proxy"
-	"github.com/nadoo/glider/stats"
 )
 
 var nm sync.Map
@@ -91,8 +90,6 @@ func (s *UDP) ListenAndServe() {
 }
 
 func (s *UDP) serveSession(session *session) {
-	sourceIP := stats.SourceIP(session.src)
-
 	// we know we are creating an udp tunnel, so the dial addr is meaningless,
 	// we use srcAddr here to help the unix client to identify the source socket.
 	dstPC, dialer, err := s.proxy.DialUDP("udp", session.src.String())
@@ -104,9 +101,7 @@ func (s *UDP) serveSession(session *session) {
 	defer dstPC.Close()
 
 	go func() {
-		proxy.CopyUDPWithObserver(session, session.src, dstPC, 2*time.Minute, 5*time.Second, func(written int) {
-			stats.AddDownload(sourceIP, written)
-		})
+		proxy.CopyUDP(session, session.src, dstPC, 2*time.Minute, 5*time.Second)
 		nm.Delete(session.key)
 		close(session.finCh)
 	}()
@@ -116,10 +111,7 @@ func (s *UDP) serveSession(session *session) {
 	for {
 		select {
 		case p := <-session.msgCh:
-			written, err := dstPC.WriteTo(p, nil) // we know it's tunnel so dst addr could be nil
-			if written > 0 {
-				stats.AddUpload(sourceIP, written)
-			}
+			_, err = dstPC.WriteTo(p, nil) // we know it's tunnel so dst addr could be nil
 			if err != nil {
 				log.F("[udp] writeTo error: %v", err)
 			}

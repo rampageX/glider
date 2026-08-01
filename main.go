@@ -14,7 +14,6 @@ import (
 	"github.com/nadoo/glider/proxy"
 	"github.com/nadoo/glider/rule"
 	"github.com/nadoo/glider/service"
-	"github.com/nadoo/glider/web"
 )
 
 var (
@@ -69,10 +68,6 @@ func main() {
 
 	// enable checkers
 	pxy.Check()
-
-	if config.Web != "" {
-		go web.New(config.Web, pxy).ListenAndServe()
-	}
 
 	// run proxy servers
 	for _, listen := range config.Listens {

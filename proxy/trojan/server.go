@@ -14,7 +14,6 @@ import (
 	"github.com/nadoo/glider/pkg/pool"
 	"github.com/nadoo/glider/pkg/socks"
 	"github.com/nadoo/glider/proxy"
-	"github.com/nadoo/glider/stats"
 )
 
 func init() {
@@ -140,8 +139,6 @@ func (s *Trojan) Serve(c net.Conn) {
 }
 
 func (s *Trojan) serveFallback(c net.Conn, tgt string, headBuf *bytes.Buffer) {
-	sourceIP := stats.SourceIP(c.RemoteAddr())
-
 	// TODO: should we access fallback directly or via proxy?
 	dialer := s.proxy.NextDialer(tgt)
 	rc, err := dialer.Dial("tcp", tgt)
@@ -151,10 +148,7 @@ func (s *Trojan) serveFallback(c net.Conn, tgt string, headBuf *bytes.Buffer) {
 	}
 	defer rc.Close()
 
-	written, err := rc.Write(headBuf.Bytes())
-	if written > 0 {
-		stats.AddUpload(sourceIP, written)
-	}
+	_, err = rc.Write(headBuf.Bytes())
 	if err != nil {
 		log.F("[trojan-fallback] write to rc error: %v", err)
 		return
@@ -200,8 +194,6 @@ func (s *Trojan) readHeader(r io.Reader) (byte, socks.Addr, error) {
 
 // ServeUoT serves udp over tcp requests.
 func (s *Trojan) ServeUoT(c net.Conn, tgt socks.Addr) {
-	sourceIP := stats.SourceIP(c.RemoteAddr())
-
 	lc, err := net.ListenPacket("udp", "")
 	if err != nil {
 		log.F("[trojan] UDP listen error: %v", err)
@@ -212,10 +204,6 @@ func (s *Trojan) ServeUoT(c net.Conn, tgt socks.Addr) {
 	pc := NewPktConn(c, tgt)
 	log.F("[trojan] %s <-UoT-> %s <-> %s", c.RemoteAddr(), lc.LocalAddr(), tgt)
 
-	go proxy.CopyUDPWithObserver(lc, nil, pc, 2*time.Minute, 5*time.Second, func(written int) {
-		stats.AddUpload(sourceIP, written)
-	})
-	proxy.CopyUDPWithObserver(pc, nil, lc, 2*time.Minute, 5*time.Second, func(written int) {
-		stats.AddDownload(sourceIP, written)
-	})
+	go proxy.CopyUDP(lc, nil, pc, 2*time.Minute, 5*time.Second)
+	proxy.CopyUDP(pc, nil, lc, 2*time.Minute, 5*time.Second)
 }

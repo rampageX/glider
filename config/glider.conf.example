@@ -26,12 +26,6 @@
 # Verbose mode, print logs
 verbose=True
 
-# WEB ADMIN
-# ---------
-# Built-in web admin interface for forwarder status and recent logs.
-# Default: :8888
-web=:8888
-
 # LISTENERS
 # ---------
 # Local listeners, we can set up multiple listeners on different port with

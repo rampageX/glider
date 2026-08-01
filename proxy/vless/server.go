@@ -11,7 +11,6 @@ import (
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/pool"
 	"github.com/nadoo/glider/proxy"
-	"github.com/nadoo/glider/stats"
 )
 
 // NewVLessServer returns a vless proxy server.
@@ -94,8 +93,6 @@ func (s *VLess) Serve(c net.Conn) {
 }
 
 func (s *VLess) serveFallback(c net.Conn, tgt string, headBuf *bytes.Buffer) {
-	sourceIP := stats.SourceIP(c.RemoteAddr())
-
 	// TODO: should we access fallback directly or via proxy?
 	dialer := s.proxy.NextDialer(tgt)
 	rc, err := dialer.Dial("tcp", tgt)
@@ -105,10 +102,7 @@ func (s *VLess) serveFallback(c net.Conn, tgt string, headBuf *bytes.Buffer) {
 	}
 	defer rc.Close()
 
-	written, err := rc.Write(headBuf.Bytes())
-	if written > 0 {
-		stats.AddUpload(sourceIP, written)
-	}
+	_, err = rc.Write(headBuf.Bytes())
 	if err != nil {
 		log.F("[vless-fallback] write to rc error: %v", err)
 		return
@@ -155,8 +149,6 @@ func (s *VLess) readHeader(r io.Reader) (CmdType, string, error) {
 
 // ServeUoT serves udp over tcp requests.
 func (s *VLess) ServeUoT(c net.Conn, tgt string) {
-	sourceIP := stats.SourceIP(c.RemoteAddr())
-
 	rc, err := net.ListenPacket("udp", "")
 	if err != nil {
 		log.F("[vless] UDP listen error: %v", err)
@@ -173,12 +165,8 @@ func (s *VLess) ServeUoT(c net.Conn, tgt string) {
 	pc := NewPktConn(c, tgtAddr)
 	log.F("[vless] %s <-UoT-> %s <-> %s", c.RemoteAddr(), rc.LocalAddr(), tgt)
 
-	go proxy.CopyUDPWithObserver(rc, nil, pc, 2*time.Minute, 5*time.Second, func(written int) {
-		stats.AddUpload(sourceIP, written)
-	})
-	proxy.CopyUDPWithObserver(pc, nil, rc, 2*time.Minute, 5*time.Second, func(written int) {
-		stats.AddDownload(sourceIP, written)
-	})
+	go proxy.CopyUDP(rc, nil, pc, 2*time.Minute, 5*time.Second)
+	proxy.CopyUDP(pc, nil, rc, 2*time.Minute, 5*time.Second)
 }
 
 // ServerConn is a vless client connection.

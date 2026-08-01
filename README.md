@@ -40,14 +40,8 @@ we can set up local listeners as proxy servers, and forward requests to internet
 - Send requests from specific local ip/interface
 - Services: 
   - dhcpd: a simple dhcp server that can run in failover mode
-- Built-in web admin dashboard for forwarder status, source IP traffic, and recent logs
 
 ## Changelog
-
-- 2026-05-05
-  - Added a built-in web admin dashboard with pages for forwarder status, source IP traffic, and recent request logs.
-  - Added the `-web` option and `web` config entry to expose the admin UI and JSON APIs.
-  - Added in-memory traffic counters grouped by source IP for both TCP and UDP relay paths.
 
 - 2026-04-30
   - Added AnyTLS client support for forwarders.
@@ -110,12 +104,6 @@ we can set up local listeners as proxy servers, and forward requests to internet
 glider -verbose -listen :8443
 # docker run --rm -it nadoo/glider -verbose -listen :8443
 ```
-
-```bash
-glider -verbose -listen :8443 -web :8888
-```
-
-Open `http://127.0.0.1:8888/status` for forwarder status, `http://127.0.0.1:8888/traffic` for per-source traffic counters, and `http://127.0.0.1:8888/logs` for recent logs. The JSON APIs are available at `/api/status`, `/api/traffic`, and `/api/logs?limit=100`.
 
 #### Help
 
@@ -204,8 +192,6 @@ OPTION:
         udp buffer size in Bytes (default 2048)
   -verbose
         verbose mode
-    -web string
-      web admin listen address (default ":8888")
 
 URL:
    proxy: SCHEME://[USER:PASS@][HOST]:PORT

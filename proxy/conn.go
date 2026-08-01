@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/nadoo/glider/pkg/pool"
-	"github.com/nadoo/glider/stats"
 )
 
 var (
@@ -57,28 +56,15 @@ func Relay(left, right net.Conn) error {
 	var err, err1 error
 	var wg sync.WaitGroup
 	var wait = 5 * time.Second
-	sourceIP := stats.SourceIP(left.RemoteAddr())
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if sourceIP == "" {
-			_, err1 = Copy(right, left)
-		} else {
-			_, err1 = CopyWithObserver(right, left, func(written int) {
-				stats.AddUpload(sourceIP, written)
-			})
-		}
+		_, err1 = Copy(right, left)
 		right.SetReadDeadline(time.Now().Add(wait)) // unblock read on right
 	}()
 
-	if sourceIP == "" {
-		_, err = Copy(left, right)
-	} else {
-		_, err = CopyWithObserver(left, right, func(written int) {
-			stats.AddDownload(sourceIP, written)
-		})
-	}
+	_, err = Copy(left, right)
 	left.SetReadDeadline(time.Now().Add(wait)) // unblock read on left
 	wg.Wait()
 
@@ -91,52 +77,6 @@ func Relay(left, right net.Conn) error {
 	}
 
 	return nil
-}
-
-// CopyWithObserver copies from src to dst and reports successful writes.
-func CopyWithObserver(dst io.Writer, src io.Reader, observer func(written int)) (written int64, err error) {
-	if observer == nil {
-		return Copy(dst, src)
-	}
-
-	size := TCPBufSize
-	if l, ok := src.(*io.LimitedReader); ok && int64(size) > l.N {
-		if l.N < 1 {
-			size = 1
-		} else {
-			size = int(l.N)
-		}
-	}
-
-	buf := pool.GetBuffer(size)
-	defer pool.PutBuffer(buf)
-
-	for {
-		nr, er := src.Read(buf)
-		if nr > 0 {
-			nw, ew := dst.Write(buf[:nr])
-			if nw > 0 {
-				written += int64(nw)
-				observer(nw)
-			}
-			if ew != nil {
-				err = ew
-				break
-			}
-			if nr != nw {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if er != nil {
-			if er != io.EOF {
-				err = er
-			}
-			break
-		}
-	}
-
-	return written, err
 }
 
 // Copy copies from src to dst.
@@ -239,11 +179,6 @@ func CopyBuffer(dst io.Writer, src io.Reader) (written int64, err error) {
 // if step sets to non-zero value,
 // the read timeout will be increased from 0 to timeout by step in every read operation.
 func CopyUDP(dst net.PacketConn, writeTo net.Addr, src net.PacketConn, timeout time.Duration, step time.Duration) error {
-	return CopyUDPWithObserver(dst, writeTo, src, timeout, step, nil)
-}
-
-// CopyUDPWithObserver copies packets and reports successful payload writes.
-func CopyUDPWithObserver(dst net.PacketConn, writeTo net.Addr, src net.PacketConn, timeout time.Duration, step time.Duration, observer func(written int)) error {
 	buf := pool.GetBuffer(UDPBufSize)
 	defer pool.PutBuffer(buf)
 
@@ -263,12 +198,9 @@ func CopyUDPWithObserver(dst net.PacketConn, writeTo net.Addr, src net.PacketCon
 			addr = writeTo
 		}
 
-		written, err := dst.WriteTo(buf[:n], addr)
+		_, err = dst.WriteTo(buf[:n], addr)
 		if err != nil {
 			return err
-		}
-		if observer != nil && written > 0 {
-			observer(written)
 		}
 	}
 }

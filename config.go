@@ -32,7 +32,6 @@ type Config struct {
 
 	DNS       string
 	DNSConfig dns.Config
-	Web       string
 
 	rules []*rule.Config
 
@@ -88,7 +87,6 @@ check=disable: disable health check`)
 	flag.BoolVar(&conf.DNSConfig.CacheLog, "dnscachelog", false, "show query log of dns cache")
 	flag.BoolVar(&conf.DNSConfig.NoAAAA, "dnsnoaaaa", false, "disable AAAA query")
 	flag.StringSliceUniqVar(&conf.DNSConfig.Records, "dnsrecord", nil, "custom dns record, format: domain/ip")
-	flag.StringVar(&conf.Web, "web", ":8888", "web admin listen address")
 
 	// service configs
 	flag.StringSliceUniqVar(&conf.Services, "service", nil, "run specified services, format: SERVICE_NAME[,SERVICE_CONFIG]")
@@ -253,7 +251,4 @@ Examples:
   
   glider -verbose -dns=:53 -dnsserver=8.8.8.8:53 -forward socks5://serverA:1080 -dnsrecord=abc.com/1.2.3.4
     -dns over proxy: listen on :53 as dns server, forward to 8.8.8.8:53 via socks5 server.
-
-	glider -listen :8443 -forward socks5://serverA:1080 -web :8888
-		-run proxy service with the web admin interface on :8888.
 `

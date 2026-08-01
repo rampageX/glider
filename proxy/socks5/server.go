@@ -12,7 +12,6 @@ import (
 	"github.com/nadoo/glider/pkg/pool"
 	"github.com/nadoo/glider/pkg/socks"
 	"github.com/nadoo/glider/proxy"
-	"github.com/nadoo/glider/stats"
 )
 
 var nm sync.Map
@@ -143,8 +142,6 @@ func (s *Socks5) ServePacket(pc net.PacketConn) {
 }
 
 func (s *Socks5) serveSession(session *Session) {
-	sourceIP := stats.SourceIP(session.src)
-
 	dstPC, dialer, err := s.proxy.DialUDP("udp", session.srcPC.target.String())
 	if err != nil {
 		log.F("[socks5u] remote dial error: %v", err)
@@ -154,9 +151,7 @@ func (s *Socks5) serveSession(session *Session) {
 	defer dstPC.Close()
 
 	go func() {
-		proxy.CopyUDPWithObserver(session.srcPC, nil, dstPC, 2*time.Minute, 5*time.Second, func(written int) {
-			stats.AddDownload(sourceIP, written)
-		})
+		proxy.CopyUDP(session.srcPC, nil, dstPC, 2*time.Minute, 5*time.Second)
 		nm.Delete(session.key)
 		close(session.finCh)
 	}()
@@ -166,10 +161,7 @@ func (s *Socks5) serveSession(session *Session) {
 	for {
 		select {
 		case msg := <-session.msgCh:
-			written, err := dstPC.WriteTo(msg.msg, msg.dst)
-			if written > 0 {
-				stats.AddUpload(sourceIP, written)
-			}
+			_, err = dstPC.WriteTo(msg.msg, msg.dst)
 			if err != nil {
 				log.F("[socks5u] writeTo %s error: %v", msg.dst, err)
 			}
