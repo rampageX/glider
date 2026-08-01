@@ -2,126 +2,69 @@ package anytls
 
 import (
 	"crypto/md5"
-	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"math/big"
 	"strconv"
 	"strings"
-	"sync/atomic"
 )
 
-const (
-	checkMark = -1
-)
+const defaultPaddingScheme = "stop=8\n0=30-30\n1=100-400\n2=400-500,c,500-1000,c,500-1000,c,500-1000,c,500-1000\n3=9-9,500-1000\n4=500-1000\n5=500-1000\n6=500-1000\n7=500-1000"
 
-var defaultPaddingScheme = []byte(`stop=8
-0=30-30
-1=100-400
-2=400-500,c,500-1000,c,500-1000,c,500-1000,c,500-1000
-3=9-9,500-1000
-4=500-1000
-5=500-1000
-6=500-1000
-7=500-1000`)
-
-type PaddingFactory struct {
-	scheme    map[string]string
-	RawScheme []byte
-	Stop      uint32
-	Md5       string
+type paddingScheme struct {
+	raw       string
+	authRange [2]int
 }
 
-var defaultPaddingFactory atomic.Pointer[PaddingFactory]
-
-func init() {
-	UpdatePaddingScheme(defaultPaddingScheme)
+func parsePaddingScheme(raw string) (paddingScheme, error) {
+	if strings.TrimSpace(raw) == "" {
+		raw = defaultPaddingScheme
+	}
+	ps := paddingScheme{raw: raw, authRange: [2]int{0, 0}}
+	for line := range strings.SplitSeq(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			return ps, fmt.Errorf("invalid padding scheme line %q", line)
+		}
+		if key == "0" {
+			r, err := parseRange(value)
+			if err != nil {
+				return ps, err
+			}
+			ps.authRange = r
+		}
+	}
+	return ps, nil
 }
 
-func UpdatePaddingScheme(rawScheme []byte) bool {
-	padding := NewPaddingFactory(rawScheme)
-	if padding == nil {
-		return false
-	}
-	defaultPaddingFactory.Store(padding)
-	return true
-}
-
-func NewPaddingFactory(rawScheme []byte) *PaddingFactory {
-	scheme := stringMapFromBytes(rawScheme)
-	if len(scheme) == 0 {
-		return nil
-	}
-
-	stop, err := strconv.Atoi(scheme["stop"])
-	if err != nil || stop <= 0 {
-		return nil
-	}
-
-	rawCopy := append([]byte(nil), rawScheme...)
-	return &PaddingFactory{
-		scheme:    scheme,
-		RawScheme: rawCopy,
-		Stop:      uint32(stop),
-		Md5:       fmt.Sprintf("%x", md5.Sum(rawCopy)),
-	}
-}
-
-func loadPaddingFactory() *PaddingFactory {
-	return defaultPaddingFactory.Load()
-}
-
-func (p *PaddingFactory) GenerateRecordPayloadSizes(pkt uint32) []int {
-	if p == nil {
-		return nil
-	}
-
-	raw, ok := p.scheme[strconv.Itoa(int(pkt))]
+func parseRange(s string) ([2]int, error) {
+	part := strings.SplitN(s, ",", 2)[0]
+	lo, hi, ok := strings.Cut(part, "-")
 	if !ok {
-		return nil
+		return [2]int{}, fmt.Errorf("invalid range %q", s)
 	}
-
-	parts := strings.Split(raw, ",")
-	sizes := make([]int, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "c" {
-			sizes = append(sizes, checkMark)
-			continue
-		}
-
-		bounds := strings.SplitN(part, "-", 2)
-		if len(bounds) != 2 {
-			continue
-		}
-
-		minSize, err := strconv.ParseInt(bounds[0], 10, 64)
-		if err != nil {
-			continue
-		}
-		maxSize, err := strconv.ParseInt(bounds[1], 10, 64)
-		if err != nil {
-			continue
-		}
-
-		if minSize > maxSize {
-			minSize, maxSize = maxSize, minSize
-		}
-		if minSize <= 0 || maxSize <= 0 {
-			continue
-		}
-
-		if minSize == maxSize {
-			sizes = append(sizes, int(minSize))
-			continue
-		}
-
-		delta, err := rand.Int(rand.Reader, big.NewInt(maxSize-minSize+1))
-		if err != nil {
-			sizes = append(sizes, int(minSize))
-			continue
-		}
-		sizes = append(sizes, int(minSize+delta.Int64()))
+	min, err := strconv.Atoi(lo)
+	if err != nil {
+		return [2]int{}, err
 	}
+	max, err := strconv.Atoi(hi)
+	if err != nil {
+		return [2]int{}, err
+	}
+	if min < 0 || max < min || max > 65535 {
+		return [2]int{}, fmt.Errorf("invalid range %q", s)
+	}
+	return [2]int{min, max}, nil
+}
 
-	return sizes
+func (p paddingScheme) authPaddingLen() int {
+	return p.authRange[0]
+}
+
+func (p paddingScheme) md5() string {
+	sum := md5.Sum([]byte(p.raw))
+	return hex.EncodeToString(sum[:])
 }
