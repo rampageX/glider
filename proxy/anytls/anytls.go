@@ -8,9 +8,16 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/nadoo/glider/proxy"
+)
+
+const (
+	defaultIdleSessionCheckInterval = 30 * time.Second
+	defaultIdleSessionTimeout       = 30 * time.Second
+	defaultMinIdleSession           = 5
 )
 
 type AnyTLS struct {
@@ -27,8 +34,13 @@ type AnyTLS struct {
 	fallback   string
 	tlsConfig  *tls.Config
 
-	synackTimeout time.Duration
-	padding       paddingScheme
+	synackTimeout            time.Duration
+	padding                  paddingScheme
+	idleSessionCheckInterval time.Duration
+	idleSessionTimeout       time.Duration
+	minIdleSession           int
+	disableReuse             bool
+	clientPool               *clientSessionPool
 }
 
 func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
@@ -54,17 +66,21 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 	}
 
 	a := &AnyTLS{
-		dialer:        d,
-		proxy:         p,
-		addr:          u.Host,
-		password:      password,
-		withTLS:       true,
-		serverName:    serverName,
-		skipVerify:    skipVerify,
-		certFile:      query.Get("cert"),
-		keyFile:       query.Get("key"),
-		fallback:      query.Get("fallback"),
-		synackTimeout: 10 * time.Second,
+		dialer:                    d,
+		proxy:                     p,
+		addr:                      u.Host,
+		password:                  password,
+		withTLS:                   true,
+		serverName:                serverName,
+		skipVerify:                skipVerify,
+		certFile:                  query.Get("cert"),
+		keyFile:                   query.Get("key"),
+		fallback:                  query.Get("fallback"),
+		synackTimeout:             10 * time.Second,
+		idleSessionCheckInterval: defaultIdleSessionCheckInterval,
+		idleSessionTimeout:       defaultIdleSessionTimeout,
+		minIdleSession:           defaultMinIdleSession,
+		disableReuse:             query.Get("disableReuse") == "true" || query.Get("disableReuse") == "1",
 	}
 
 	if a.password == "" {
@@ -88,6 +104,30 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 			return nil, fmt.Errorf("[anytls] invalid synackTimeout: %s", err)
 		}
 		a.synackTimeout = d
+	}
+	if value := query.Get("idleSessionCheckInterval"); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return nil, fmt.Errorf("[anytls] invalid idleSessionCheckInterval: %s", err)
+		}
+		a.idleSessionCheckInterval = d
+	}
+	if value := query.Get("idleSessionTimeout"); value != "" {
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return nil, fmt.Errorf("[anytls] invalid idleSessionTimeout: %s", err)
+		}
+		a.idleSessionTimeout = d
+	}
+	if value := query.Get("minIdleSession"); value != "" {
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, fmt.Errorf("[anytls] invalid minIdleSession: %s", err)
+		}
+		if n < 0 {
+			n = 0
+		}
+		a.minIdleSession = n
 	}
 
 	if scheme := query.Get("paddingScheme"); scheme != "" {
@@ -130,6 +170,8 @@ func init() {
 AnyTLS client scheme:
   anytls://password@host:port[?serverName=SERVERNAME][&skipVerify=true][&cert=PATH][&synackTimeout=10s]
   anytls://password@host:port[?sni=SERVERNAME][&insecure=1]   (legacy aliases kept for compatibility)
+  anytls://password@host:port[?idleSessionCheckInterval=30s][&idleSessionTimeout=30s][&minIdleSession=5]
+  anytls://password@host:port[?disableReuse=true]            (debug/strict 1:1 connections)
   anytlsc://password@host:port     (cleartext, without TLS)
 
 AnyTLS server scheme:
