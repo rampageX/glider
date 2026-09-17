@@ -18,6 +18,7 @@ All notable changes in this fork are documented here.
 
 ### Changed
 
+- - Updated the AnyTLS implementation with session reuse, legacy URL option compatibility, non-blocking stream setup, and per-stream deadline isolation.
 - Human-facing health-check, group-status and forwarder failure logs prefer the configured display name while retaining address fallback compatibility.
 - Quoted display names such as `name="AnyTLS TCP US"` are normalized by removing surrounding quotes.
 - WebUI status terminology distinguishes an enabled LHA group from a group that has already handled traffic.
@@ -32,3 +33,5 @@ All notable changes in this fork are documented here.
 ### Notes
 
 `Current LHA` represents the last forwarder actually selected for a real connection. It is intentionally empty until the first connection passes through that LHA group; health-check probes alone do not create a current selection.
+
+ 
