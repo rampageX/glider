@@ -1,0 +1,29 @@
+name: Tag v0.20.0
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: github.repository == 'rampageX/glider'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Create v0.20.0 tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git ls-remote --exit-code --tags origin refs/tags/v0.20.0 >/dev/null 2>&1; then
+            echo "v0.20.0 already exists"
+            exit 0
+          fi
+          git tag -a v0.20.0 -m "glider v0.20.0"
+          git push origin v0.20.0
