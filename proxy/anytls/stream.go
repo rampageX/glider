@@ -1,187 +1,199 @@
 package anytls
 
 import (
-	"bytes"
+	"errors"
 	"io"
 	"net"
 	"os"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
-type Stream struct {
-	id   uint32
-	sess *Session
+var errStreamClosed = errors.New("stream closed")
 
-	mu         sync.Mutex
-	readBuf    bytes.Buffer
-	readNotify chan struct{}
-	closed     chan struct{}
-	dieOnce    sync.Once
-	dieErr     error
-	dieHook    func()
-
-	readDeadline  atomic.Value
-	writeDeadline atomic.Value
+type streamDeadline struct {
+	mu    sync.Mutex
+	timer *time.Timer
+	ch    chan struct{}
+	seq   uint64
 }
 
-func newStream(id uint32, sess *Session) *Stream {
-	return &Stream{
-		id:         id,
-		sess:       sess,
-		readNotify: make(chan struct{}, 1),
-		closed:     make(chan struct{}),
-	}
+func newStreamDeadline() *streamDeadline {
+	return &streamDeadline{ch: make(chan struct{})}
 }
 
-func (s *Stream) Read(b []byte) (int, error) {
-	for {
-		s.mu.Lock()
-		if s.readBuf.Len() > 0 {
-			n, _ := s.readBuf.Read(b)
-			err := error(nil)
-			if n == 0 && s.dieErr != nil {
-				err = s.dieErr
-			}
-			s.mu.Unlock()
-			return n, err
-		}
-		err := s.dieErr
-		s.mu.Unlock()
-
-		if err != nil {
-			return 0, err
-		}
-
-		deadline := s.loadDeadline(&s.readDeadline)
-		if deadline.IsZero() {
-			select {
-			case <-s.readNotify:
-			case <-s.closed:
-			}
-			continue
-		}
-
-		wait := time.Until(deadline)
-		if wait <= 0 {
-			return 0, os.ErrDeadlineExceeded
-		}
-		timer := time.NewTimer(wait)
-		select {
-		case <-s.readNotify:
-			timer.Stop()
-		case <-s.closed:
-			timer.Stop()
-		case <-timer.C:
-			return 0, os.ErrDeadlineExceeded
-		}
-	}
+func (d *streamDeadline) wait() <-chan struct{} {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.ch
 }
 
-func (s *Stream) Write(b []byte) (int, error) {
-	if deadline := s.loadDeadline(&s.writeDeadline); !deadline.IsZero() && time.Until(deadline) <= 0 {
-		return 0, os.ErrDeadlineExceeded
+func (d *streamDeadline) set(t time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.seq++
+	seq := d.seq
+	if d.timer != nil {
+		d.timer.Stop()
+		d.timer = nil
 	}
 
-	s.mu.Lock()
-	err := s.dieErr
-	s.mu.Unlock()
-	if err != nil {
-		return 0, err
-	}
-
-	return s.sess.writeDataFrame(s.id, b)
-}
-
-func (s *Stream) Close() error {
-	return s.closeWithError(io.ErrClosedPipe)
-}
-
-func (s *Stream) closeLocally() {
-	var once bool
-	s.dieOnce.Do(func() {
-		s.mu.Lock()
-		s.dieErr = net.ErrClosed
-		s.mu.Unlock()
-		close(s.closed)
-		once = true
-	})
-	if once && s.dieHook != nil {
-		s.dieHook()
-		s.dieHook = nil
-	}
-}
-
-func (s *Stream) closeWithError(err error) error {
-	var once bool
-	s.dieOnce.Do(func() {
-		s.mu.Lock()
-		s.dieErr = err
-		s.mu.Unlock()
-		close(s.closed)
-		once = true
-	})
-	if !once {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		return s.dieErr
-	}
-	if s.dieHook != nil {
-		s.dieHook()
-		s.dieHook = nil
-	}
-	return s.sess.streamClosed(s.id)
-}
-
-func (s *Stream) SetReadDeadline(t time.Time) error {
-	s.readDeadline.Store(t)
-	return nil
-}
-
-func (s *Stream) SetWriteDeadline(t time.Time) error {
-	s.writeDeadline.Store(t)
-	return nil
-}
-
-func (s *Stream) SetDeadline(t time.Time) error {
-	_ = s.SetReadDeadline(t)
-	_ = s.SetWriteDeadline(t)
-	return nil
-}
-
-func (s *Stream) LocalAddr() net.Addr {
-	if conn, ok := s.sess.conn.(interface{ LocalAddr() net.Addr }); ok {
-		return conn.LocalAddr()
-	}
-	return nil
-}
-
-func (s *Stream) RemoteAddr() net.Addr {
-	if conn, ok := s.sess.conn.(interface{ RemoteAddr() net.Addr }); ok {
-		return conn.RemoteAddr()
-	}
-	return nil
-}
-
-func (s *Stream) feed(data []byte) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.dieErr != nil {
-		return
-	}
-	_, _ = s.readBuf.Write(data)
+	closed := false
 	select {
-	case s.readNotify <- struct{}{}:
+	case <-d.ch:
+		closed = true
 	default:
 	}
+
+	if t.IsZero() {
+		if closed {
+			d.ch = make(chan struct{})
+		}
+		return
+	}
+
+	dur := time.Until(t)
+	if dur <= 0 {
+		if !closed {
+			close(d.ch)
+		}
+		return
+	}
+
+	if closed {
+		d.ch = make(chan struct{})
+	}
+	ch := d.ch
+	d.timer = time.AfterFunc(dur, func() {
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		if d.seq != seq || d.ch != ch {
+			return
+		}
+		select {
+		case <-ch:
+		default:
+			close(ch)
+		}
+		d.timer = nil
+	})
 }
 
-func (s *Stream) loadDeadline(value *atomic.Value) time.Time {
-	v := value.Load()
-	if v == nil {
-		return time.Time{}
+type stream struct {
+	id uint32
+	s  *session
+
+	in       chan []byte
+	readBuf  []byte
+	readDone chan struct{}
+	closeIn  sync.Once
+	closeOut sync.Once
+
+	readDeadline  *streamDeadline
+	writeDeadline *streamDeadline
+
+	mu     sync.Mutex
+	closed bool
+}
+
+func newStream(id uint32, s *session) *stream {
+	return &stream{
+		id:            id,
+		s:             s,
+		in:            make(chan []byte, 32),
+		readDone:      make(chan struct{}),
+		readDeadline:  newStreamDeadline(),
+		writeDeadline: newStreamDeadline(),
 	}
-	deadline, _ := v.(time.Time)
-	return deadline
+}
+
+func (st *stream) Read(p []byte) (int, error) {
+	for len(st.readBuf) == 0 {
+		select {
+		case b := <-st.in:
+			st.readBuf = b
+		case <-st.readDone:
+			return 0, io.EOF
+		case <-st.readDeadline.wait():
+			return 0, os.ErrDeadlineExceeded
+		}
+	}
+	n := copy(p, st.readBuf)
+	st.readBuf = st.readBuf[n:]
+	return n, nil
+}
+
+func (st *stream) Write(p []byte) (int, error) {
+	st.mu.Lock()
+	closed := st.closed
+	st.mu.Unlock()
+	if closed {
+		return 0, errStreamClosed
+	}
+
+	written := 0
+	for len(p) > 0 {
+		select {
+		case <-st.writeDeadline.wait():
+			if written > 0 {
+				return written, os.ErrDeadlineExceeded
+			}
+			return 0, os.ErrDeadlineExceeded
+		default:
+		}
+
+		n := min(len(p), maxFrameData)
+		if err := st.s.writeFrame(frame{command: cmdPSH, streamID: st.id, data: p[:n]}); err != nil {
+			return written, err
+		}
+		written += n
+		p = p[n:]
+	}
+	return written, nil
+}
+
+func (st *stream) Close() error {
+	st.mu.Lock()
+	already := st.closed
+	st.closed = true
+	st.mu.Unlock()
+	if !already {
+		st.closeRead()
+		st.closeOut.Do(func() {
+			_ = st.s.writeFrame(frame{command: cmdFIN, streamID: st.id})
+		})
+		st.s.removeStream(st.id)
+	}
+	return nil
+}
+
+func (st *stream) closeRead() {
+	st.closeIn.Do(func() { close(st.readDone) })
+}
+
+func (st *stream) push(data []byte) {
+	cp := make([]byte, len(data))
+	copy(cp, data)
+	select {
+	case <-st.readDone:
+	case <-st.s.done:
+	case st.in <- cp:
+	}
+}
+
+func (st *stream) LocalAddr() net.Addr  { return st.s.conn.LocalAddr() }
+func (st *stream) RemoteAddr() net.Addr { return st.s.conn.RemoteAddr() }
+func (st *stream) SetDeadline(t time.Time) error {
+	st.readDeadline.set(t)
+	st.writeDeadline.set(t)
+	return nil
+}
+func (st *stream) SetReadDeadline(t time.Time) error {
+	st.readDeadline.set(t)
+	return nil
+}
+func (st *stream) SetWriteDeadline(t time.Time) error {
+	st.writeDeadline.set(t)
+	return nil
 }
