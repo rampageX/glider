@@ -36,9 +36,12 @@
     .badge.ok { background:rgba(34,197,94,.14); color:#86efac; border-color:rgba(34,197,94,.28); }
     .badge.bad { background:rgba(239,68,68,.14); color:#fca5a5; border-color:rgba(239,68,68,.28); }
     .current-box { margin:0 0 16px; padding:14px 16px; border:1px solid rgba(56,189,248,.35); border-radius:14px; background:linear-gradient(135deg,rgba(56,189,248,.13),rgba(14,165,233,.05)); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .current-box.waiting { border-color:rgba(148,163,184,.25); background:rgba(148,163,184,.05); }
     .current-label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
     .current-name { color:#7dd3fc; font-size:18px; font-weight:700; }
+    .current-box.waiting .current-name { color:var(--muted); }
     .current-latency { color:var(--muted); font-size:14px; }
+    .current-note { color:var(--muted); font-size:13px; }
     table { width:100%; border-collapse:collapse; background:rgba(2,6,23,.4); min-width:650px; }
     .table-wrap { overflow-x:auto; border-radius:16px; }
     th,td { padding:12px 14px; text-align:left; font-size:14px; border-bottom:1px solid rgba(148,163,184,.12); }
@@ -65,7 +68,7 @@
         <a class="nav-link" href="/traffic"><span class="nav-label">Traffic</span><span class="nav-hint">By source IP</span></a>
         <a class="nav-link" href="/logs"><span class="nav-label">Logs</span><span class="nav-hint">Recent entries</span></a>
       </nav>
-      <section class="sidebar-foot">For LHA groups, CURRENT is the last forwarder actually selected for traffic.</section>
+      <section class="sidebar-foot">For LHA groups, CURRENT is the last forwarder actually selected for traffic. Before the first connection, no node is assumed.</section>
     </aside>
 
     <section class="main">
@@ -99,14 +102,19 @@
       const ok=groups.filter(g=>g.status==='SUCCESS').length;
       const total=groups.reduce((n,g)=>n+g.total_count,0);
       const enabled=groups.reduce((n,g)=>n+g.enabled_count,0);
-      const active=groups.filter(g=>g.strategy==='lha'&&g.current).length;
-      summaryEl.innerHTML=[card('Groups',groups.length),card('Healthy Groups',ok),card('Enabled Forwarders',enabled),card('Active LHA',active),card('Total Forwarders',total)].join('');
+      const lhaGroups=groups.filter(g=>g.strategy==='lha').length;
+      summaryEl.innerHTML=[card('Groups',groups.length),card('Healthy Groups',ok),card('Enabled Forwarders',enabled),card('LHA Groups',lhaGroups),card('Total Forwarders',total)].join('');
     }
     function renderGroups(groups){
       if(!groups.length){groupsEl.innerHTML='<section class="panel empty">No forward groups found.</section>';return;}
       groupsEl.innerHTML=groups.map(group=>{
         const badgeClass=group.status==='SUCCESS'?'ok':'bad';
-        const currentBox=group.strategy==='lha'?`<div class="current-box"><span class="current-label">Current LHA</span><span class="current-name">${escapeHtml(group.current||'Waiting for traffic...')}</span>${group.current?`<span class="current-latency">${group.current_latency_ms} ms</span>`:''}</div>`:'';
+        let currentBox='';
+        if(group.strategy==='lha'){
+          currentBox=group.current
+            ? `<div class="current-box"><span class="current-label">Current LHA</span><span class="current-name">${escapeHtml(group.current)}</span><span class="current-latency">${group.current_latency_ms} ms</span></div>`
+            : `<div class="current-box waiting"><span class="current-label">Current LHA</span><span class="current-name">--</span><span class="current-note">Waiting for first connection</span></div>`;
+        }
         const forwarders=[...(group.forwarders||[])].sort((a,b)=>{
           if(a.current!==b.current)return a.current?-1:1;
           return Number(a.latency_ms||0)-Number(b.latency_ms||0);
