@@ -20,6 +20,7 @@ type Forwarder struct {
 	proxy.Dialer
 	url         string
 	addr        string
+	name        string
 	priority    uint32
 	maxFailures uint32 // maxfailures to set to Disabled
 	disabled    uint32
@@ -98,6 +99,7 @@ func (f *Forwarder) parseOption(option string) error {
 	f.SetPriority(uint32(priority))
 
 	f.intface = query.Get("interface")
+	f.name = query.Get("name")
 
 	return err
 }
@@ -105,6 +107,14 @@ func (f *Forwarder) parseOption(option string) error {
 // Addr returns the forwarder's addr.
 // NOTE: addr returns for chained dialers: dialer1Addr,dialer2Addr,...
 func (f *Forwarder) Addr() string {
+	return f.addr
+}
+
+// Name returns the configured display name, or Addr when no name is configured.
+func (f *Forwarder) Name() string {
+	if f.name != "" {
+		return f.name
+	}
 	return f.addr
 }
 
@@ -134,10 +144,8 @@ func (f *Forwarder) IncFailures() {
 		return
 	}
 
-	// log.F("[forwarder] %s(%d) recorded %d failures, maxfailures: %d", f.addr, f.Priority(), failures, f.MaxFailures())
-
 	if failures == f.MaxFailures() && f.Enabled() {
-		log.F("[forwarder] %s(%d) reaches maxfailures: %d", f.addr, f.Priority(), f.MaxFailures())
+		log.F("[forwarder] %s(%d) reaches maxfailures: %d", f.Name(), f.Priority(), f.MaxFailures())
 		f.Disable()
 	}
 }
