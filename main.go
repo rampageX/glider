@@ -18,25 +18,19 @@ import (
 )
 
 var (
-	version = "0.17.0"
+	version = "0.20.0"
 	config  = parseConfig()
 )
 
 func main() {
-	// global rule proxy
 	pxy := rule.NewProxy(config.Forwards, &config.Strategy, config.rules)
-
-	// ipset manager
 	ipsetM, _ := ipset.NewManager(config.rules)
 
-	// check and setup dns server
 	if config.DNS != "" {
 		d, err := dns.NewServer(config.DNS, pxy, &config.DNSConfig)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		// rules
 		for _, r := range config.rules {
 			if len(r.DNSServers) > 0 {
 				for _, domain := range r.Domain {
@@ -44,16 +38,11 @@ func main() {
 				}
 			}
 		}
-
-		// add a handler to update proxy rules when a domain resolved
 		d.AddHandler(pxy.AddDomainIP)
 		if ipsetM != nil {
 			d.AddHandler(ipsetM.AddDomainIP)
 		}
-
 		d.Start()
-
-		// custom resolver
 		net.DefaultResolver = &net.Resolver{
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -67,14 +56,11 @@ func main() {
 		r.IP, r.CIDR, r.Domain = nil, nil, nil
 	}
 
-	// enable checkers
 	pxy.Check()
-
 	if config.Web != "" {
 		go web.New(config.Web, pxy).ListenAndServe()
 	}
 
-	// run proxy servers
 	for _, listen := range config.Listens {
 		local, err := proxy.ServerFromURL(listen, pxy)
 		if err != nil {
@@ -83,7 +69,6 @@ func main() {
 		go local.ListenAndServe()
 	}
 
-	// run services
 	for _, s := range config.Services {
 		service, err := service.New(s)
 		if err != nil {
