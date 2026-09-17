@@ -62,11 +62,13 @@ func (s *AnyTLS) Dial(network, addr string) (net.Conn, error) {
 		s.clientPool.discard(ss)
 		return nil, err
 	}
-	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
-		_ = st.Close()
-		s.clientPool.discard(ss)
-		return nil, err
-	}
+
+	// Do not synchronously wait for SYNACK here.  The upstream AnyTLS client
+	// returns the stream immediately after SYN + target are written and handles
+	// SYNACK asynchronously.  Waiting here adds an extra application-visible RTT
+	// (and, for a health check, serializes the remote outbound connect before the
+	// HTTP request can even be sent), which makes a warm AnyTLS session look much
+	// slower than sing-box/anytls-go.
 	return &clientConn{Conn: st, session: ss, pool: s.clientPool}, nil
 }
 
@@ -102,11 +104,8 @@ func (s *AnyTLS) DialUDP(network, addr string) (net.PacketConn, error) {
 		s.clientPool.discard(ss)
 		return nil, err
 	}
-	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
-		_ = st.Close()
-		s.clientPool.discard(ss)
-		return nil, err
-	}
+
+	// Same as TCP: let data flow immediately and process SYNACK asynchronously.
 	return &clientPacketConn{PacketConn: newUOTPacketConn(st, target), session: ss, pool: s.clientPool}, nil
 }
 
