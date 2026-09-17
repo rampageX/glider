@@ -2,17 +2,16 @@
 setlocal EnableExtensions
 
 cd /d "%~dp0"
-title glider - Windows Test Build
+title glider - Windows Build
 
 echo ============================================================
-echo  glider - Windows Test Build
+echo  glider - Windows Build
 echo ============================================================
 echo.
 
 where go >nul 2>nul
 if errorlevel 1 (
     echo [ERROR] Go was not found in PATH.
-    echo.
     echo Please install Go or add it to PATH, then run this file again.
     goto :FAIL
 )
@@ -32,12 +31,6 @@ echo [INFO] Branch : %GIT_BRANCH%
 echo [INFO] Commit : %GIT_COMMIT%
 echo.
 
-if /i not "%GIT_BRANCH%"=="dev-lha-ui" if /i not "%GIT_BRANCH%"=="unknown" (
-    echo [WARN] You are not currently on dev-lha-ui.
-    echo [WARN] The build will continue, but please check GitHub Desktop.
-    echo.
-)
-
 if not exist "build" mkdir "build"
 if errorlevel 1 (
     echo [ERROR] Could not create the build directory.
@@ -49,7 +42,7 @@ if exist "build\glider.exe" (
     del /f /q "build\glider.exe" >nul 2>nul
     if exist "build\glider.exe" (
         echo [ERROR] Could not remove the old glider.exe.
-        echo [HINT]  Make sure glider.exe is not still running.
+        echo [HINT] Make sure glider.exe is not still running.
         goto :FAIL
     )
 )
@@ -84,7 +77,7 @@ echo.
 echo ============================================================
 echo  BUILD FAILED
 echo ============================================================
-echo Copy or screenshot the error above and send it to me.
+echo Copy or screenshot the error above for troubleshooting.
 echo ============================================================
 echo.
 pause
