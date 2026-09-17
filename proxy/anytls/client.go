@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"sync"
 
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/socks"
@@ -21,7 +22,11 @@ func NewAnyTLSDialer(s string, d proxy.Dialer) (proxy.Dialer, error) {
 		return nil, fmt.Errorf("[anytls] create instance error: %s", err)
 	}
 	a.tlsConfig, err = loadClientTLSConfig(a.serverName, a.certFile, a.skipVerify)
-	return a, err
+	if err != nil {
+		return nil, err
+	}
+	a.clientPool = newClientSessionPool(a, a.idleSessionCheckInterval, a.idleSessionTimeout, a.minIdleSession, a.disableReuse)
+	return a, nil
 }
 
 func NewClearTextDialer(s string, d proxy.Dialer) (proxy.Dialer, error) {
@@ -30,6 +35,7 @@ func NewClearTextDialer(s string, d proxy.Dialer) (proxy.Dialer, error) {
 		return nil, fmt.Errorf("[anytlsc] create instance error: %s", err)
 	}
 	a.withTLS = false
+	a.clientPool = newClientSessionPool(a, a.idleSessionCheckInterval, a.idleSessionTimeout, a.minIdleSession, a.disableReuse)
 	return a, nil
 }
 
@@ -41,26 +47,27 @@ func (s *AnyTLS) Dial(network, addr string) (net.Conn, error) {
 	if raw == nil {
 		return nil, fmt.Errorf("[anytls] invalid target address: %s", addr)
 	}
-	ss, err := s.newClientSession()
+
+	ss, err := s.clientPool.acquire()
 	if err != nil {
 		return nil, err
 	}
 	st, err := ss.openStream()
 	if err != nil {
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
 	if _, err := st.Write(raw); err != nil {
 		_ = st.Close()
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
 	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
 		_ = st.Close()
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
-	return &clientConn{Conn: st, session: ss}, nil
+	return &clientConn{Conn: st, session: ss, pool: s.clientPool}, nil
 }
 
 func (s *AnyTLS) DialUDP(network, addr string) (net.PacketConn, error) {
@@ -75,31 +82,32 @@ func (s *AnyTLS) DialUDP(network, addr string) (net.PacketConn, error) {
 	if raw == nil {
 		return nil, fmt.Errorf("[anytls] invalid udp-over-tcp target address")
 	}
-	ss, err := s.newClientSession()
+
+	ss, err := s.clientPool.acquire()
 	if err != nil {
 		return nil, err
 	}
 	st, err := ss.openStream()
 	if err != nil {
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
 	if _, err := st.Write(raw); err != nil {
 		_ = st.Close()
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
 	if err := writeUOTV2Request(st, target); err != nil {
 		_ = st.Close()
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
 	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
 		_ = st.Close()
-		_ = ss.Close()
+		s.clientPool.discard(ss)
 		return nil, err
 	}
-	return &clientPacketConn{PacketConn: newUOTPacketConn(st, target), session: ss}, nil
+	return &clientPacketConn{PacketConn: newUOTPacketConn(st, target), session: ss, pool: s.clientPool}, nil
 }
 
 func (s *AnyTLS) newClientSession() (*session, error) {
@@ -133,21 +141,29 @@ func (s *AnyTLS) newClientSession() (*session, error) {
 type clientConn struct {
 	net.Conn
 	session *session
+	pool    *clientSessionPool
+	once    sync.Once
 }
 
 func (c *clientConn) Close() error {
 	err := c.Conn.Close()
-	_ = c.session.Close()
+	c.once.Do(func() {
+		c.pool.release(c.session)
+	})
 	return err
 }
 
 type clientPacketConn struct {
 	net.PacketConn
 	session *session
+	pool    *clientSessionPool
+	once    sync.Once
 }
 
 func (c *clientPacketConn) Close() error {
 	err := c.PacketConn.Close()
-	_ = c.session.Close()
+	c.once.Do(func() {
+		c.pool.release(c.session)
+	})
 	return err
 }
