@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/nadoo/glider/proxy"
@@ -37,31 +36,52 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 	if err != nil {
 		return nil, fmt.Errorf("[anytls] parse url err: %s", err)
 	}
+
 	query := u.Query()
+	password := ""
+	if u.User != nil {
+		password = u.User.Username()
+	}
+
+	serverName := query.Get("serverName")
+	if serverName == "" {
+		serverName = query.Get("sni")
+	}
+
+	skipVerify := query.Get("skipVerify") == "true"
+	if insecure := query.Get("insecure"); insecure == "1" || insecure == "true" {
+		skipVerify = true
+	}
+
 	a := &AnyTLS{
 		dialer:        d,
 		proxy:         p,
 		addr:          u.Host,
-		password:      u.User.Username(),
+		password:      password,
 		withTLS:       true,
-		serverName:    query.Get("serverName"),
-		skipVerify:    query.Get("skipVerify") == "true",
+		serverName:    serverName,
+		skipVerify:    skipVerify,
 		certFile:      query.Get("cert"),
 		keyFile:       query.Get("key"),
 		fallback:      query.Get("fallback"),
 		synackTimeout: 10 * time.Second,
 	}
+
 	if a.password == "" {
 		return nil, errors.New("[anytls] password must be specified")
 	}
+
 	if a.addr != "" {
-		if _, port, _ := net.SplitHostPort(a.addr); port == "" {
-			a.addr = net.JoinHostPort(a.addr, "443")
+		host, port, splitErr := net.SplitHostPort(a.addr)
+		if splitErr != nil || port == "" {
+			host = u.Hostname()
+			a.addr = net.JoinHostPort(host, "443")
 		}
 		if a.serverName == "" {
-			a.serverName = a.addr[:strings.LastIndex(a.addr, ":")]
+			a.serverName = host
 		}
 	}
+
 	if timeout := query.Get("synackTimeout"); timeout != "" {
 		d, err := time.ParseDuration(timeout)
 		if err != nil {
@@ -69,6 +89,7 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 		}
 		a.synackTimeout = d
 	}
+
 	if scheme := query.Get("paddingScheme"); scheme != "" {
 		a.padding, err = parsePaddingScheme(scheme)
 	} else {
@@ -77,6 +98,7 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 	if err != nil {
 		return nil, fmt.Errorf("[anytls] invalid padding scheme: %s", err)
 	}
+
 	return a, nil
 }
 
@@ -107,6 +129,7 @@ func init() {
 	proxy.AddUsage("anytls", `
 AnyTLS client scheme:
   anytls://password@host:port[?serverName=SERVERNAME][&skipVerify=true][&cert=PATH][&synackTimeout=10s]
+  anytls://password@host:port[?sni=SERVERNAME][&insecure=1]   (legacy aliases kept for compatibility)
   anytlsc://password@host:port     (cleartext, without TLS)
 
 AnyTLS server scheme:
