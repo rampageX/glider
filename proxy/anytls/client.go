@@ -1,211 +1,153 @@
 package anytls
 
 import (
-	"io"
-	"math"
+	"crypto/tls"
+	"fmt"
 	"net"
-	"sort"
-	"sync"
-	"sync/atomic"
-	"time"
+
+	"github.com/nadoo/glider/pkg/log"
+	"github.com/nadoo/glider/pkg/socks"
+	"github.com/nadoo/glider/proxy"
 )
 
-type Client struct {
-	dialOut func() (net.Conn, error)
-
-	sessionCounter atomic.Uint64
-
-	idleSessionLock sync.Mutex
-	idleSessions    []*Session
-
-	sessionsLock sync.Mutex
-	sessions     map[uint64]*Session
-
-	idleSessionTimeout time.Duration
-	minIdleSession     int
-	closed             atomic.Bool
-	stopCleanup        chan struct{}
+func init() {
+	proxy.RegisterDialer("anytls", NewAnyTLSDialer)
+	proxy.RegisterDialer("anytlsc", NewClearTextDialer)
 }
 
-func NewClient(dialOut func() (net.Conn, error), idleSessionCheckInterval, idleSessionTimeout time.Duration, minIdleSession int) *Client {
-	if idleSessionCheckInterval <= 5*time.Second {
-		idleSessionCheckInterval = defaultIdleSessionCheckInterval
-	}
-	if idleSessionTimeout <= 5*time.Second {
-		idleSessionTimeout = defaultIdleSessionTimeout
-	}
-
-	c := &Client{
-		dialOut:            dialOut,
-		sessions:           make(map[uint64]*Session),
-		idleSessionTimeout: idleSessionTimeout,
-		minIdleSession:     minIdleSession,
-		stopCleanup:        make(chan struct{}),
-	}
-
-	go c.idleCleanupLoop(idleSessionCheckInterval)
-	return c
-}
-
-func (c *Client) CreateStream() (*Stream, error) {
-	if c.closed.Load() {
-		return nil, io.ErrClosedPipe
-	}
-
-	var (
-		session *Session
-		err     error
-	)
-
-	session = c.getIdleSession()
-	if session == nil {
-		session, err = c.createSession()
-	}
-	if session == nil {
-		if err == nil {
-			err = io.ErrClosedPipe
-		}
-		return nil, err
-	}
-
-	stream, err := session.OpenStream()
+func NewAnyTLSDialer(s string, d proxy.Dialer) (proxy.Dialer, error) {
+	a, err := NewAnyTLS(s, d, nil)
 	if err != nil {
-		session.Close()
-		return nil, err
+		return nil, fmt.Errorf("[anytls] create instance error: %s", err)
 	}
-
-	stream.dieHook = func() {
-		if c.closed.Load() || session.IsClosed() {
-			session.Close()
-			return
-		}
-
-		c.idleSessionLock.Lock()
-		session.idleSince = time.Now()
-		c.idleSessions = append(c.idleSessions, session)
-		sort.Slice(c.idleSessions, func(i, j int) bool {
-			return c.idleSessions[i].seq > c.idleSessions[j].seq
-		})
-		c.idleSessionLock.Unlock()
-	}
-
-	return stream, nil
+	a.tlsConfig, err = loadClientTLSConfig(a.serverName, a.certFile, a.skipVerify)
+	return a, err
 }
 
-func (c *Client) Close() error {
-	if !c.closed.CompareAndSwap(false, true) {
-		return io.ErrClosedPipe
+func NewClearTextDialer(s string, d proxy.Dialer) (proxy.Dialer, error) {
+	a, err := NewAnyTLS(s, d, nil)
+	if err != nil {
+		return nil, fmt.Errorf("[anytlsc] create instance error: %s", err)
 	}
-
-	close(c.stopCleanup)
-
-	c.sessionsLock.Lock()
-	sessions := make([]*Session, 0, len(c.sessions))
-	for _, session := range c.sessions {
-		sessions = append(sessions, session)
-	}
-	c.sessions = make(map[uint64]*Session)
-	c.sessionsLock.Unlock()
-
-	for _, session := range sessions {
-		session.Close()
-	}
-
-	return nil
+	a.withTLS = false
+	return a, nil
 }
 
-func (c *Client) getIdleSession() *Session {
-	c.idleSessionLock.Lock()
-	defer c.idleSessionLock.Unlock()
-
-	for len(c.idleSessions) > 0 {
-		session := c.idleSessions[0]
-		c.idleSessions = c.idleSessions[1:]
-		if session != nil && !session.IsClosed() {
-			return session
-		}
+func (s *AnyTLS) Dial(network, addr string) (net.Conn, error) {
+	if network != "tcp" && network != "tcp4" && network != "tcp6" {
+		return nil, proxy.ErrNotSupported
 	}
-
-	return nil
-}
-
-func (c *Client) createSession() (*Session, error) {
-	underlying, err := c.dialOut()
+	raw := socks.ParseAddr(addr)
+	if raw == nil {
+		return nil, fmt.Errorf("[anytls] invalid target address: %s", addr)
+	}
+	ss, err := s.newClientSession()
 	if err != nil {
 		return nil, err
 	}
-
-	session := NewClientSession(underlying)
-	session.seq = c.sessionCounter.Add(1)
-	session.dieHook = func() {
-		c.idleSessionLock.Lock()
-		filtered := c.idleSessions[:0]
-		for _, idle := range c.idleSessions {
-			if idle != session {
-				filtered = append(filtered, idle)
-			}
-		}
-		c.idleSessions = filtered
-		c.idleSessionLock.Unlock()
-
-		c.sessionsLock.Lock()
-		delete(c.sessions, session.seq)
-		c.sessionsLock.Unlock()
+	st, err := ss.openStream()
+	if err != nil {
+		_ = ss.Close()
+		return nil, err
 	}
-
-	c.sessionsLock.Lock()
-	c.sessions[session.seq] = session
-	c.sessionsLock.Unlock()
-
-	session.Run()
-	return session, nil
+	if _, err := st.Write(raw); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	return &clientConn{Conn: st, session: ss}, nil
 }
 
-func (c *Client) idleCleanupLoop(interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			c.idleCleanup(time.Now().Add(-c.idleSessionTimeout))
-		case <-c.stopCleanup:
-			return
-		}
+func (s *AnyTLS) DialUDP(network, addr string) (net.PacketConn, error) {
+	if network != "udp" && network != "udp4" && network != "udp6" {
+		return nil, proxy.ErrNotSupported
 	}
+	target := socks.ParseAddr(addr)
+	if target == nil {
+		return nil, fmt.Errorf("[anytls] invalid target address: %s", addr)
+	}
+	raw := socks.ParseAddr(net.JoinHostPort(uotV2MagicHost, "0"))
+	if raw == nil {
+		return nil, fmt.Errorf("[anytls] invalid udp-over-tcp target address")
+	}
+	ss, err := s.newClientSession()
+	if err != nil {
+		return nil, err
+	}
+	st, err := ss.openStream()
+	if err != nil {
+		_ = ss.Close()
+		return nil, err
+	}
+	if _, err := st.Write(raw); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	if err := writeUOTV2Request(st, target); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	if err := ss.waitSYNACK(st.id, s.synackTimeout); err != nil {
+		_ = st.Close()
+		_ = ss.Close()
+		return nil, err
+	}
+	return &clientPacketConn{PacketConn: newUOTPacketConn(st, target), session: ss}, nil
 }
 
-func (c *Client) idleCleanup(expireBefore time.Time) {
-	var toClose []*Session
-
-	c.idleSessionLock.Lock()
-	activeCount := 0
-	kept := c.idleSessions[:0]
-	for _, session := range c.idleSessions {
-		if session == nil || session.IsClosed() {
-			continue
-		}
-		if !session.idleSince.Before(expireBefore) {
-			activeCount++
-			kept = append(kept, session)
-			continue
-		}
-		if activeCount < max(c.minIdleSession, 0) {
-			activeCount++
-			session.idleSince = time.Now()
-			kept = append(kept, session)
-			continue
-		}
-		toClose = append(toClose, session)
+func (s *AnyTLS) newClientSession() (*session, error) {
+	rc, err := s.dialer.Dial("tcp", s.addr)
+	if err != nil {
+		log.F("[anytls] dial to %s error: %s", s.addr, err)
+		return nil, err
 	}
-	c.idleSessions = kept
-	c.idleSessionLock.Unlock()
-
-	for _, session := range toClose {
-		session.Close()
+	c := rc
+	if s.withTLS {
+		tc := tls.Client(rc, s.tlsConfig)
+		if err := tc.Handshake(); err != nil {
+			_ = rc.Close()
+			return nil, err
+		}
+		c = tc
 	}
+	if err := writeAuth(c, s.password, s.padding.authPaddingLen()); err != nil {
+		_ = c.Close()
+		return nil, err
+	}
+	ss := newSession(c)
+	if err := ss.writeFrame(frame{command: cmdSettings, data: clientSettings(s.padding)}); err != nil {
+		_ = c.Close()
+		return nil, err
+	}
+	ss.start()
+	return ss, nil
 }
 
-func max(a, b int) int {
-	return int(math.Max(float64(a), float64(b)))
+type clientConn struct {
+	net.Conn
+	session *session
+}
+
+func (c *clientConn) Close() error {
+	err := c.Conn.Close()
+	_ = c.session.Close()
+	return err
+}
+
+type clientPacketConn struct {
+	net.PacketConn
+	session *session
+}
+
+func (c *clientPacketConn) Close() error {
+	err := c.PacketConn.Close()
+	_ = c.session.Close()
+	return err
 }
