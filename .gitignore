@@ -38,3 +38,6 @@ config/rules.d/*.list
 glider
 /bak/
 /rules.d/
+
+# Local Windows test builds
+/build/
