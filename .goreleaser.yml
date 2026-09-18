@@ -57,8 +57,8 @@ checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
 
 release:
-  prerelease: true
-  draft: true
+  prerelease: false
+  draft: false
 
 nfpms:
   - id: glider
