@@ -18,12 +18,11 @@ All notable changes in this fork are documented here.
 
 ### Changed
 
-- - Updated the AnyTLS implementation with session reuse, legacy URL option compatibility, non-blocking stream setup, and per-stream deadline isolation.
+- Updated the AnyTLS implementation with session reuse, legacy URL option compatibility, non-blocking stream setup, and per-stream deadline isolation.
 - Human-facing health-check, group-status and forwarder failure logs prefer the configured display name while retaining address fallback compatibility.
 - Quoted display names such as `name="AnyTLS TCP US"` are normalized by removing surrounding quotes.
 - WebUI status terminology distinguishes an enabled LHA group from a group that has already handled traffic.
 - The status API reports the scheduler strategy actually selected during group initialization rather than relying on shared configuration state.
-- Updated the AnyTLS implementation with session reuse, legacy URL option compatibility, non-blocking stream setup, and per-stream deadline isolation.
 
 ### Compatibility
 
