@@ -5,40 +5,51 @@ before:
     - go mod tidy
 
 builds:
-  - id: default
+  - id: windows
     env:
       - CGO_ENABLED=0
     goos:
       - windows
-      - linux
-    #   - darwin
-    #   - freebsd
     goarch:
-      # - 386
       - amd64
-      # - arm
-      # - arm64
-      # - mips
-      # - mipsle
-      # - mips64
-      # - mips64le
-      # - riscv64
     goamd64:
       - v1
       - v4
     ldflags:
       - -s -w
-    # goarm:
-    #   - 6
-    #   - 7
-    # gomips:
-    #   - hardfloat
-    #   - softfloat
+
+  - id: linux
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - 386
+      - amd64
+      - arm
+      - arm64
+      - riscv64
+    go386:
+      - sse2
+    goamd64:
+      - v1
+      - v4
+    goarm:
+      - 5
+      - 6
+      - 7
+    goarm64:
+      - v8.0
+    goriscv64:
+      - rva20u64
+    ldflags:
+      - -s -w
 
 archives:
   - id: default
     builds:
-      - default
+      - windows
+      - linux
     wrap_in_directory: true
     formats: tar.gz
     format_overrides:
@@ -62,6 +73,8 @@ release:
 
 nfpms:
   - id: glider
+    builds:
+      - linux
     package_name: glider
     vendor: nadoo
     homepage: https://github.com/nadoo/glider
@@ -69,9 +82,7 @@ nfpms:
     description: Glider is a forward proxy with multiple protocols support, and also a dns/dhcp server with ipset management features(like dnsmasq).
     license: GPL-3.0 License
     formats:
-      # - apk
       - deb
-      # - rpm
     dependencies:
       - libsystemd0
     bindir: /usr/bin

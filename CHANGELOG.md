@@ -2,6 +2,15 @@
 
 All notable changes in this fork are documented here.
 
+## [0.20.1] - 2026-09-25
+
+### Changed
+
+- Split GoReleaser targets into dedicated Windows and Linux builds.
+- Restored Linux multi-architecture releases for 386, amd64, ARMv5, ARMv6, ARMv7, ARM64 and RISC-V 64.
+- ARMv5 is built with Go's software-float ABI; ARMv6/ARMv7 use the standard hard-float ABI.
+- Kept Windows releases focused on amd64 (v1 and v4).
+
 ## [0.20.0] - 2026-09-17
 
 ### Added
@@ -33,5 +42,3 @@ All notable changes in this fork are documented here.
 ### Notes
 
 `Current LHA` represents the last forwarder actually selected for a real connection. It is intentionally empty until the first connection passes through that LHA group; health-check probes alone do not create a current selection.
-
- 
