@@ -2,6 +2,27 @@
 
 All notable changes in this fork are documented here.
 
+## [0.21.0] - 2026-09-27
+
+### Added
+
+- Daily LHA availability history for each group and forwarder.
+- A WebUI history page at `/lha`, including per-node availability and 15-minute availability/latency timelines with jitter shown in the time-window summaries.
+- Most and least stable time-window summaries for each forwarder.
+- A date-query API at `/api/lha/history?date=YYYY-MM-DD`.
+- Append-only daily JSONL history stored in a separate default directory for each Glider instance.
+- `GLIDER_LHA_HISTORY_PATH` to override the history directory.
+- `GLIDER_LHA_HISTORY_RETENTION_DAYS` to configure history retention; the default is 30 local dates and `0` disables cleanup.
+
+### Changed
+
+- Expired history files are cleaned up at startup and when a new local day's history file is opened. Cleanup only removes regular files whose names match `YYYY-MM-DD.jsonl`.
+
+### Compatibility
+
+- Existing LHA health checks and scheduling behavior are unchanged.
+- History persistence failures do not prevent the proxy from starting.
+
 ## [0.20.1] - 2026-09-25
 
 ### Changed

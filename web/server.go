@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/nadoo/glider/pkg/log"
@@ -40,9 +41,11 @@ func (s *Server) ListenAndServe() {
 	})
 	router.GET("/shared.css", s.serveAsset("shared.css", "text/css; charset=utf-8"))
 	router.GET("/status", s.servePage("status.html"))
+	router.GET("/lha", s.servePage("lha.html"))
 	router.GET("/logs", s.servePage("logs.html"))
 	router.GET("/traffic", s.servePage("traffic.html"))
 	router.GET("/api/status", s.handleStatus)
+	router.GET("/api/lha/history", s.handleLHAHistory)
 	router.GET("/api/logs", s.handleLogs)
 	router.GET("/api/traffic", s.handleTraffic)
 
@@ -50,6 +53,19 @@ func (s *Server) ListenAndServe() {
 	if err := router.Run(s.addr); err != nil {
 		log.Fatalf("[web] failed to listen on %s: %v", s.addr, err)
 	}
+}
+
+func (s *Server) handleLHAHistory(c *gin.Context) {
+	date := time.Now()
+	if raw := c.Query("date"); raw != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", raw, time.Local)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "date must use YYYY-MM-DD"})
+			return
+		}
+		date = parsed
+	}
+	c.JSON(http.StatusOK, stats.AvailabilityForDay(date))
 }
 
 func (s *Server) servePage(name string) gin.HandlerFunc {

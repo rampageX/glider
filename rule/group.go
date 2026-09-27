@@ -14,6 +14,7 @@ import (
 
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/proxy"
+	"github.com/nadoo/glider/stats"
 )
 
 type priSlice []*Forwarder
@@ -143,11 +144,26 @@ func (p *FwdrGroup) check(fwdr *Forwarder, checker Checker) {
 		elapsed, err := checker.Check(fwdr)
 		if err != nil {
 			if errors.Is(err, proxy.ErrNotSupported) { fwdr.SetMaxFailures(0); log.F("[check] %s: %s(%d), %s, stop checking", p.name, fwdr.Name(), fwdr.Priority(), err); fwdr.Enable(); break }
+			p.recordAvailability(fwdr, false, 0)
 			wait++; if wait > 16 { wait = 16 }
 			log.F("[check] %s: %s(%d), FAILED. error: %s", p.name, fwdr.Name(), fwdr.Priority(), err); fwdr.Disable(); continue
 		}
 		wait = 1; p.setLatency(fwdr, elapsed)
+		p.recordAvailability(fwdr, true, elapsed)
 		log.F("[check] %s: %s(%d), SUCCESS. Elapsed: %dms, Latency: %dms.", p.name, fwdr.Name(), fwdr.Priority(), elapsed.Milliseconds(), time.Duration(fwdr.Latency()).Milliseconds()); fwdr.Enable()
+	}
+}
+
+func (p *FwdrGroup) recordAvailability(fwdr *Forwarder, success bool, latency time.Duration) {
+	if p.strategy != "lha" {
+		return
+	}
+	err := stats.RecordLHAAvailability(stats.AvailabilitySample{
+		At: time.Now(), Group: p.name, Node: fwdr.Name(), Addr: fwdr.Addr(),
+		Priority: fwdr.Priority(), Success: success, LatencyMS: float64(latency) / float64(time.Millisecond),
+	})
+	if err != nil {
+		log.F("[lha-history] %s/%s: %s", p.name, fwdr.Name(), err)
 	}
 }
 

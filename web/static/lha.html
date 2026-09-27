@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glider LHA History</title>
+  <link rel="stylesheet" href="/shared.css">
+  <style>
+    :root {
+      --bg: linear-gradient(145deg, #08111f 0%, #0f172a 45%, #172554 100%);
+      --panel: rgba(15, 23, 42, 0.78); --border: rgba(148, 163, 184, 0.22);
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+      --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --ui-font: var(--font); --nav-hover-border: rgba(56, 189, 248, 0.55);
+      --nav-active-bg: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(14, 165, 233, 0.08));
+      --nav-active-border: rgba(56, 189, 248, 0.5); --control-bg: rgba(15, 23, 42, 0.95);
+      --control-hover-border: rgba(56, 189, 248, 0.6);
+    }
+    .summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+    .summary .panel { padding:17px 19px; }
+    .summary-label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
+    .summary-value { font-size:29px; margin-top:9px; font-weight:700; }
+    .panel-pad { padding:20px; margin-bottom:18px; }
+    .section-title { margin:0 0 14px; font-size:19px; }
+    .toolbar .date-label { display:flex; align-items:center; gap:8px; color:var(--muted); }
+    .content-grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(340px,.9fr); gap:18px; }
+    .table-wrap { overflow:auto; border-radius:14px; }
+    table { width:100%; min-width:660px; border-collapse:collapse; background:rgba(2,6,23,.36); }
+    th,td { padding:11px 12px; text-align:left; font-size:13px; border-bottom:1px solid rgba(148,163,184,.12); }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    tr.group-row td { background:rgba(56,189,248,.08); font-weight:700; }
+    .node-cell { padding-left:25px; }
+    .muted { color:var(--muted); }
+    .controls { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
+    .controls label { display:grid; gap:5px; color:var(--muted); font-size:12px; }
+    .controls select { min-width:170px; }
+    .chart-card { padding:20px; }
+    .chart-title { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+    .chart-title h2 { margin:0; font-size:19px; }
+    .chart-subtitle { color:var(--muted); font-size:13px; margin-top:5px; }
+    .periods { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0 10px; }
+    .period { border:1px solid var(--border); border-radius:13px; padding:11px 13px; background:rgba(2,6,23,.3); }
+    .period strong { display:block; margin-top:5px; font-size:15px; }
+    .period.best { border-color:rgba(34,197,94,.32); }
+    .period.worst { border-color:rgba(239,68,68,.32); }
+    .chart-wrap { margin-top:12px; }
+    .chart-label { font-size:12px; color:var(--muted); margin:14px 0 2px; }
+    canvas { display:block; width:100%; height:170px; }
+    .legend { display:flex; gap:18px; flex-wrap:wrap; color:var(--muted); font-size:12px; margin-top:7px; }
+    .legend span::before { content:""; display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:7px; background:var(--dot); }
+    .empty { padding:38px 16px; text-align:center; color:var(--muted); }
+    .footnote { color:var(--muted); font-size:12px; line-height:1.6; margin-top:12px; }
+    @media(max-width:1040px){ .content-grid{grid-template-columns:1fr;} }
+    @media(max-width:560px){ .periods{grid-template-columns:1fr;} .panel-pad,.chart-card{padding:15px;} }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <aside class="sidebar">
+      <section><div class="brand-kicker">Glider Admin</div><h1 class="brand-title">Navigation</h1><div class="brand-subtitle">Daily LHA availability and node stability history.</div></section>
+      <nav class="nav">
+        <a class="nav-link" href="/status"><span class="nav-label">Status</span><span class="nav-hint">Forward groups</span></a>
+        <a class="nav-link active" href="/lha"><span class="nav-label">LHA History</span><span class="nav-hint">Daily availability</span></a>
+        <a class="nav-link" href="/traffic"><span class="nav-label">Traffic</span><span class="nav-hint">By source IP</span></a>
+        <a class="nav-link" href="/logs"><span class="nav-label">Logs</span><span class="nav-hint">Recent entries</span></a>
+      </nav>
+      <section class="sidebar-foot">History is collected from LHA health checks. Availability is based on probe results; a node with no checks in a time window is shown as a gap.</section>
+    </aside>
+    <section class="main">
+      <section class="hero panel">
+        <div><h1 class="page-title">LHA Availability</h1><div class="page-subtitle" id="updated-at">Loading daily history...</div></div>
+        <div class="toolbar"><label class="date-label">Day <input id="day" type="date"></label><button id="refresh" type="button">Refresh</button></div>
+      </section>
+      <section class="summary" id="summary"></section>
+      <div class="content-grid">
+        <section class="panel panel-pad">
+          <h2 class="section-title">Groups and nodes</h2>
+          <div class="table-wrap" id="table-wrap"></div>
+          <div class="footnote">Group availability is measured in observed 15-minute windows where at least one node passed its health check. Node availability is successful checks divided by all checks.</div>
+        </section>
+        <section class="panel chart-card">
+          <div class="chart-title"><div><h2>Node stability timeline</h2><div class="chart-subtitle" id="node-caption">Choose an LHA node to inspect its day.</div></div></div>
+          <div class="controls"><label>Group<select id="group-select"></select></label><label>Node<select id="node-select"></select></label></div>
+          <div class="periods"><div class="period best"><span class="muted">Most stable observed window</span><strong id="best-period">—</strong><span class="muted" id="best-detail"></span></div><div class="period worst"><span class="muted">Least stable observed window</span><strong id="worst-period">—</strong><span class="muted" id="worst-detail"></span></div></div>
+          <div class="chart-wrap"><div class="chart-label">Probe availability</div><canvas id="availability-chart" aria-label="Availability over the day"></canvas><div class="legend"><span style="--dot:#34d399">Successful probes</span></div><div class="chart-label">Successful probe latency</div><canvas id="latency-chart" aria-label="Latency over the day"></canvas><div class="legend"><span style="--dot:#38bdf8">Average latency</span></div></div>
+          <div class="footnote">Each point represents a 15-minute bucket. Latency is shown only for successful checks. “Most stable” prioritizes availability, then lower latency variation and lower average latency.</div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script>
+    const dayInput=document.getElementById('day'), summaryEl=document.getElementById('summary'), tableEl=document.getElementById('table-wrap');
+    const updatedEl=document.getElementById('updated-at'), groupSelect=document.getElementById('group-select'), nodeSelect=document.getElementById('node-select');
+    let historyData={groups:[]};
+    const today=new Date();
+    dayInput.value=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    dayInput.max=dayInput.value;
+    function esc(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');}
+    function pct(v){return `${Number(v||0).toFixed(2)}%`;}
+    function card(label,value){return `<article class="panel"><div class="summary-label">${label}</div><div class="summary-value">${value}</div></article>`;}
+    function selectedGroup(){return historyData.groups[Number(groupSelect.value)]||null;}
+    function selectedNode(){const g=selectedGroup();return g?.nodes?.[Number(nodeSelect.value)]||null;}
+    function renderSummary(){
+      const groups=historyData.groups||[], nodes=groups.reduce((n,g)=>n+(g.nodes||[]).length,0), checks=groups.reduce((n,g)=>n+(g.nodes||[]).reduce((x,node)=>x+node.checks,0),0);
+      const mean=groups.length?groups.reduce((n,g)=>n+g.availability,0)/groups.length:0;
+      summaryEl.innerHTML=[card('LHA Groups',groups.length),card('Nodes',nodes),card('Observed Checks',checks),card('Mean Group Availability',pct(mean))].join('');
+    }
+    function renderTable(){
+      const groups=historyData.groups||[];
+      if(!groups.length){tableEl.innerHTML='<div class="empty">No LHA probe history for this date yet.</div>';return;}
+      tableEl.innerHTML=`<table><thead><tr><th>Group / Node</th><th>Availability</th><th>Checks</th><th>Avg latency</th><th>Most stable</th><th>Least stable</th></tr></thead><tbody>${groups.map((g,gi)=>`<tr class="group-row"><td>${esc(g.name)}</td><td>${pct(g.availability)}</td><td>${g.available_windows}/${g.checks} windows</td><td>—</td><td>—</td><td>—</td></tr>${(g.nodes||[]).map((n,ni)=>`<tr><td class="node-cell">${esc(n.name)}<div class="muted">${esc(n.addr)}</div></td><td>${n.checks?pct(n.availability):'—'}</td><td>${n.successes}/${n.checks}</td><td>${n.avg_latency_ms?`${n.avg_latency_ms.toFixed(1)} ms`:'—'}</td><td>${n.best_slot?`${n.best_slot.start}–${n.best_slot.end}`:'—'}</td><td>${n.worst_slot?`${n.worst_slot.start}–${n.worst_slot.end}`:'—'}</td></tr>`).join('')}`).join('')}</tbody></table>`;
+    }
+    function renderSelectors(preferredGroup=0,preferredNode=0){
+      const groups=historyData.groups||[];
+      groupSelect.innerHTML=groups.map((g,i)=>`<option value="${i}">${esc(g.name)}</option>`).join('');
+      if(!groups.length){nodeSelect.innerHTML='';renderNode();return;}
+      groupSelect.value=String(Math.min(preferredGroup,groups.length-1));
+      const fillNodes=()=>{const g=selectedGroup();nodeSelect.innerHTML=(g?.nodes||[]).map((n,i)=>`<option value="${i}">${esc(n.name)} — ${esc(n.addr)}</option>`).join('');if(g?.nodes?.length)nodeSelect.value=String(Math.min(preferredNode,g.nodes.length-1));renderNode();};
+      groupSelect.onchange=()=>{preferredNode=0;fillNodes();};
+      nodeSelect.onchange=renderNode;
+      fillNodes();
+    }
+    function periodText(slot){return slot?`${slot.start}–${slot.end}`:'No observed windows';}
+    function periodDetail(slot){return slot?`${pct(slot.availability)} · ${slot.successes}/${slot.checks} checks · ${slot.avg_latency_ms.toFixed(1)} ms avg · ${slot.jitter_ms.toFixed(1)} ms jitter`:'';}
+    function drawChart(canvas,slots,key,color,maxValue,format){
+      const rect=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1,width=Math.max(320,rect.width),height=170;
+      canvas.width=Math.round(width*ratio);canvas.height=Math.round(height*ratio);const ctx=canvas.getContext('2d');ctx.setTransform(ratio,0,0,ratio,0,0);
+      ctx.clearRect(0,0,width,height);const left=54,right=14,top=12,bottom=27,cw=width-left-right,ch=height-top-bottom;
+      ctx.font='11px Segoe UI, sans-serif';ctx.fillStyle='#94a3b8';ctx.strokeStyle='rgba(148,163,184,.16)';ctx.lineWidth=1;
+      for(let i=0;i<=4;i++){const y=top+ch*i/4,val=maxValue*(1-i/4);ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(width-right,y);ctx.stroke();ctx.fillText(format(val),5,y+4);}
+      [0,6,12,18,24].forEach((hour,i)=>{const x=left+cw*i/4;ctx.beginPath();ctx.moveTo(x,top);ctx.lineTo(x,top+ch);ctx.stroke();ctx.fillText(`${String(hour).padStart(2,'0')}:00`,x-15,height-6);});
+      ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();let active=false;
+      slots.forEach((slot,i)=>{const hasData=key==='avg_latency_ms'?slot.successes>0:slot.checks>0;const raw=hasData?Number(slot[key]):NaN;if(!Number.isFinite(raw)){active=false;return;}const value=Math.max(0,Math.min(maxValue,raw)),x=left+cw*(i+.5)/slots.length,y=top+ch*(1-value/maxValue);if(!active){ctx.moveTo(x,y);active=true;}else ctx.lineTo(x,y);});
+      ctx.stroke();
+    }
+    function renderNode(){
+      const group=selectedGroup(),node=selectedNode();
+      if(!group||!node){document.getElementById('node-caption').textContent='Choose an LHA node to inspect its day.';document.getElementById('best-period').textContent='—';document.getElementById('worst-period').textContent='—';drawChart(document.getElementById('availability-chart'),[],'availability','#34d399',100,v=>`${Math.round(v)}%`);drawChart(document.getElementById('latency-chart'),[],'avg_latency_ms','#38bdf8',100,v=>`${Math.round(v)} ms`);return;}
+      document.getElementById('node-caption').textContent=`${group.name} · ${node.name} · ${node.addr}`;
+      document.getElementById('best-period').textContent=periodText(node.best_slot);document.getElementById('best-detail').textContent=periodDetail(node.best_slot);
+      document.getElementById('worst-period').textContent=periodText(node.worst_slot);document.getElementById('worst-detail').textContent=periodDetail(node.worst_slot);
+      const maxLatency=Math.max(100,...(node.slots||[]).map(x=>x.avg_latency_ms||0));
+      drawChart(document.getElementById('availability-chart'),node.slots||[],'availability','#34d399',100,v=>`${Math.round(v)}%`);
+      drawChart(document.getElementById('latency-chart'),node.slots||[],'avg_latency_ms','#38bdf8',Math.ceil(maxLatency/50)*50,v=>`${Math.round(v)} ms`);
+    }
+    async function refresh(){
+      updatedEl.textContent='Loading daily history...';
+      try{const response=await fetch(`/api/lha/history?date=${encodeURIComponent(dayInput.value)}`,{cache:'no-store'});if(!response.ok)throw new Error(`HTTP ${response.status}`);historyData=await response.json();renderSummary();renderTable();renderSelectors();updatedEl.textContent=`${historyData.date} · ${historyData.timezone} · ${historyData.bucket_minutes}-minute windows`;}
+      catch(error){summaryEl.innerHTML=card('Status','Load failed');tableEl.innerHTML=`<div class="empty">Failed to load LHA history: ${esc(error.message)}</div>`;updatedEl.textContent='Request failed';}
+    }
+    document.getElementById('refresh').addEventListener('click',refresh);dayInput.addEventListener('change',refresh);window.addEventListener('resize',renderNode);refresh();
+  </script>
+</body>
+</html>

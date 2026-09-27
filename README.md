@@ -4,15 +4,12 @@ A compact multi-protocol forward proxy with flexible proxy chains, rule-based ro
 
 This repository is a maintained fork derived from [nadoo/glider](https://github.com/nadoo/glider) and [0xec/glider](https://github.com/0xec/glider). It keeps glider's lightweight design while adding practical observability for latency-based high availability (LHA) operation.
 
-## v0.20.0 highlights
+## v0.21.0 highlights
 
-- Built-in WebUI with **Status**, **Traffic**, and **Logs** pages.
-- Friendly forwarder aliases using the `name` forwarder option.
-- LHA runtime observability: the WebUI shows the forwarder that was actually selected for traffic.
-- LHA selection/switch logs without logging every connection.
-- Correct idle state before the first connection: `Current LHA -- / Waiting for first connection`.
-- Status API exposes forwarder names, runtime strategy, current LHA selection, and current latency.
-- One-click Windows local build helper: `build-windows.bat`.
+- Daily LHA availability statistics for groups and their forwarders.
+- Per-forwarder daily availability and 15-minute availability/latency timelines, with jitter and the most/least stable windows shown in the summaries.
+- New WebUI history page at `/lha` and query API at `/api/lha/history?date=YYYY-MM-DD`.
+- Persistent daily JSONL history, separated automatically by Glider instance, with configurable retention (30 local dates by default).
 
 ## Forwarder aliases
 
@@ -38,7 +35,7 @@ checklatencysamples=6
 checktolerance=50
 ```
 
-LHA scheduling behavior itself is unchanged. v0.20.0 adds visibility around the scheduler rather than replacing it.
+The v0.20.x releases added runtime visibility around LHA. v0.21.0 adds daily availability history; it does not change the LHA scheduler.
 
 After the first real connection, the log records the selected node:
 
@@ -65,13 +62,26 @@ web=:8888
 Then open:
 
 - `/status` — forwarder health, latency, strategy and current LHA selection
+- `/lha` — daily LHA availability by group/node, with best/worst time windows and latency waveforms
 - `/traffic` — traffic counters grouped by source IP
 - `/logs` — recent in-memory logs
 - `/api/status` — JSON status API
+- `/api/lha/history?date=YYYY-MM-DD` — daily LHA probe history and 15-minute node buckets
 - `/api/traffic` — JSON traffic API
 - `/api/logs?limit=100` — JSON log API
 
 The WebUI is embedded into the glider binary; no separate web files or web server are required at runtime.
+
+### LHA history storage
+
+History is appended to one `YYYY-MM-DD.jsonl` file per local date. By default, Glider writes it under a per-instance `glider-lha-history-<id>` directory in the configuration directory. The stable instance ID is derived from the listener, Web/DNS address and service settings.
+
+- `GLIDER_LHA_HISTORY_PATH` overrides the history directory. Relative paths are resolved from Glider's working directory. Give each instance a different path when overriding this variable.
+- `GLIDER_LHA_HISTORY_RETENTION_DAYS` sets how many local dates to keep. The default is `30`; set it to `0` to disable automatic cleanup.
+
+Expired date files are removed at startup and when a new day's history file is opened. Cleanup only targets regular files named `YYYY-MM-DD.jsonl`.
+
+Node availability is the successful-check percentage. Group availability is the percentage of observed 15-minute windows in which at least one node passed its check. Windows with no probe data remain gaps in the timeline. The most stable window ranks availability first, then lower latency variation and lower average latency.
 
 ## Scheduling strategies
 
@@ -128,7 +138,7 @@ glider -verbose -config glider.conf client
 
 The `name=` option is display metadata only. Existing forwarder URLs without a name continue to work and use their address as the display label.
 
-The v0.20.0 LHA changes are intentionally observational: health checks and the existing LHA scheduling algorithm are preserved.
+The v0.20.x and v0.21.0 LHA changes are observational: health checks and the existing LHA scheduling algorithm are preserved. History storage failures do not stop the proxy from running.
 
 ## Changelog
 
