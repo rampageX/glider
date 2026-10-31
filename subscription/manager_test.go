@@ -353,3 +353,23 @@ func TestSharedCacheRefilterAndRefreshSerialization(t *testing.T) {
 		t.Fatal("other instance modified")
 	}
 }
+
+func TestPriorityTiesAndTotalHandshakeTimeout(t *testing.T) {
+	paths, e := routes([]string{"direct://#priority=1", "socks5h://127.0.0.1:2#priority=5", "socks5h://127.0.0.1:3#priority=5"})
+	if e != nil || len(paths) != 3 || !strings.Contains(paths[0].definition, ":2#") || !strings.Contains(paths[1].definition, ":3#") || paths[2].priority != 1 {
+		t.Fatal("priority/tie order", e)
+	}
+	var hits atomic.Int64
+	route := socksFixture(t, "", &hits, true)
+	c := testConfig(t.TempDir(), "http://unresolvable.invalid/sub")
+	c.Paths = []string{route}
+	c.Timeout = 1
+	m := manager(t, c)
+	start := time.Now()
+	if _, _, _, e := m.input(context.Background(), c.URLs[0]); e == nil {
+		t.Fatal("hanging handshake succeeded")
+	}
+	if time.Since(start) > 2500*time.Millisecond {
+		t.Fatal("total timeout ignored")
+	}
+}

@@ -86,7 +86,7 @@ func (f *Forwarder) parseOption(option string) error {
 	}
 	f.SetPriority(uint32(priority))
 	f.intface = query.Get("interface")
-	f.name = strings.Trim(strings.TrimSpace(query.Get("name")), "\"'")
+	f.name = query.Get("name")
 	return err
 }
 

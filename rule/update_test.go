@@ -128,7 +128,13 @@ func TestHealthExitAndConcurrentSnapshots(t *testing.T) {
 	}
 	wg.Wait()
 	start := time.Now()
-	p.Close()
+	closed := make(chan struct{})
+	go func() { p.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(time.Second):
+		t.Fatal("health tasks did not exit")
+	}
 	if time.Since(start) > time.Second {
 		t.Fatal("check sleep not canceled")
 	}

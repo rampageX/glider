@@ -19,6 +19,7 @@ import (
 type route struct {
 	definition string
 	priority   int
+	intface    string
 }
 
 func routes(paths []string) ([]route, error) {
@@ -36,7 +37,8 @@ func routes(paths []string) ([]route, error) {
 		if u.Scheme == "" {
 			return nil, errors.New("invalid subscription-proxy")
 		}
-		out = append(out, route{s, int(f.Priority())})
+		opts, _ := url.ParseQuery(u.Fragment)
+		out = append(out, route{definition: s, priority: int(f.Priority()), intface: opts.Get("interface")})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].priority > out[j].priority })
 	if len(out) == 0 {
@@ -95,7 +97,7 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.duration(c.Timeout))
 	defer cancel()
-	base, e := proxy.NewDirect("", c.duration(c.ConnectTimeout), 0)
+	base, e := proxy.NewDirect(r.intface, c.duration(c.ConnectTimeout), 0)
 	if e != nil {
 		return nil, e
 	}

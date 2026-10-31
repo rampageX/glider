@@ -20,7 +20,7 @@ func ss(name string) string {
 }
 func TestSSFormats(t *testing.T) {
 	pass := "密码 空格@:#&+,百分%25"
-	name := "香港 +, @:#&%25"
+	name := "  '香港 +, @:#&%25'  "
 	user := "aes-128-gcm:" + pass
 	for _, s := range []string{
 		"ss://" + base64.StdEncoding.EncodeToString([]byte(user)) + "@example.test:443/#" + url.PathEscape(name),
