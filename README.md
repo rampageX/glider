@@ -1,36 +1,38 @@
 # glider
 
-A compact multi-protocol forward proxy with flexible proxy chains, rule-based routing, health checking, DNS/DHCP features, and a built-in WebUI.
+[English](README.en.md) | 简体中文
 
-This repository is a maintained fork derived from [nadoo/glider](https://github.com/nadoo/glider) and [0xec/glider](https://github.com/0xec/glider). It keeps glider's lightweight design while adding practical observability for latency-based high availability (LHA) operation.
+轻量级多协议转发代理，支持灵活的代理链、规则路由、健康检查、DNS/DHCP 和内置 Web 管理界面。
 
-## v0.22.0 highlights
+本仓库基于 [nadoo/glider](https://github.com/nadoo/glider) 与 [0xec/glider](https://github.com/0xec/glider) 维护，在保留 Glider 轻量设计的基础上，增加节点名称、LHA 运行状态与历史统计，以及原生订阅管理。
 
-**Native SS/SSR subscriptions, live node updates, and subscription status in the WebUI.**
+## v0.22.0 更新亮点
 
-- **Built-in subscription management:** download and parse multiple SS/SSR subscriptions, preserve node names, and filter regions using configurable literal keywords. No external update script is required.
-- **Update nodes while running:** generate standard `forward=` files and apply changes without restarting Glider. Identical definitions keep their health state; all-input failures or empty candidates retain the current nodes. Partial failures exclude the failed input.
-- **Independent download fallback per subscription:** ordered direct/proxy GET attempts, a shared cross-process cache, and atomic cache/output writes.
-- **Visible subscription health:** optional titles, masked URLs, individual success/failure results, check/download timestamps, and the next refresh time on Status.
-- **Conservative failure retries:** a separate retry interval defaults to **7200 seconds (two hours)**; a shorter normal refresh interval does not bring a failed retry forward.
-- **Configurable storage and diagnostics:** Linux cache defaults to `/tmp/.subscription-cache`, LHA history to `/tmp/.glider-history`; `-verbose` adds diagnostics without printing subscription URLs, tokens, or response bodies.
+**原生 SS/SSR 订阅、运行中更新节点、Web 页面查看订阅状态。**
 
-[Download v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.22.0.md)
+- **内置订阅管理：** 支持多个 SS/SSR 订阅，保留节点名称，使用可配置的字面关键词筛选区域，无需外部更新脚本。
+- **运行中更新：** 自动生成标准 `forward=` 节点文件，无需重启即可应用变化。定义未变的节点保留健康状态；所有订阅失败或候选列表为空时保留当前节点。部分失败时，仅使用成功的订阅输入。
+- **各订阅独立尝试下载路径：** 按顺序通过直连或代理执行 GET，支持跨进程共享缓存，以及缓存和输出文件的原子写入。
+- **订阅状态可见：** Status 页面显示订阅标题、脱敏 URL、各订阅成功/失败结果、检查/下载时间与下次刷新时间。
+- **谨慎重试：** 失败重试间隔独立设置，默认 **7200 秒（两小时）**，较短的正常刷新周期不会提前触发失败重试。
+- **可配置的存储与调试：** Linux 默认缓存目录为 `/tmp/.subscription-cache`，LHA 历史目录为 `/tmp/.glider-history`；启用 `-verbose` 可查看调试信息，不输出订阅 URL、token 或响应正文。
 
-## Native SS/SSR subscriptions
+[下载 v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.22.0.md)
 
-Each instance can manage its own region and output file. Multiple instances can share a common subscription configuration and raw cache while keeping their runtime node lists independent.
+## 原生 SS/SSR 订阅
 
-### Quick start
+每个实例独立管理区域、节点输出文件及运行中的节点列表。多个实例可以通过公共配置共享订阅地址、下载设置和原始订阅缓存。
 
-Replace the placeholder URL and adjust the proxy route, paths and listeners for your deployment. This example selects names/groups containing `香港` or `日本`, excluding `遊戲`:
+### 快速开始
+
+请替换占位订阅地址，并按实际部署调整代理路径、目录和监听地址。以下示例保留名称/分组包含“香港”或“日本”的节点，排除“遊戲”：
 
 ```ini
 listen=127.0.0.1:7575
 web=127.0.0.1:8885
 strategy=lha
 
-subscription-title=Primary subscription
+subscription-title=主订阅
 subscription=https://subscription.example.invalid/REPLACE_TOKEN
 subscription-region=asia
 subscription-match=香港
@@ -48,26 +50,26 @@ subscription-cache-dir=/tmp/.subscription-cache
 lha-history-dir=/tmp/.glider-history
 ```
 
-Run with `glider -config /path/to/glider.conf`, then open `http://127.0.0.1:8885/status` on the same machine. The process needs write access to the output, cache and history directories.
+使用 `glider -config /path/to/glider.conf` 启动，然后在同一台机器打开 `http://127.0.0.1:8885/status`。运行用户需要对节点输出、缓存与历史目录具有写入权限。
 
-- Repeat `subscription=` for multiple inputs. Titles are optional; when used, provide one `subscription-title=` per input in the same order.
-- Download routes use Glider's existing forwarder syntax: higher `#priority=` first, declaration order for ties. `direct://` explicitly means direct access; `socks5h://` sends destination names to the SOCKS server.
-- The normal refresh interval, cache TTL and failure retry interval are **separate settings**. A valid cache can be reused without another GET; reading it does not extend its age. Successful cached inputs remain reusable during a partial-failure retry.
-- Startup restores the last successful output file when available, then refreshes in the background. A first-time installation can fetch subscriptions and start forwarding without an old node file.
-- Matching uses SS names or SSR group + remarks, with case-sensitive literal substrings. Only SS/SSR are converted; recognized unsupported sharing schemes are counted and skipped.
-- On Linux, `systemctl kill -s HUP glider` manually requests a refresh for a service named `glider`; it still respects cache TTL. The Status page's **Refresh now** button only reloads the displayed status.
+- 多个订阅重复填写 `subscription=`。标题可选；使用标题时，`subscription-title=` 必须与订阅数量一致，按顺序一一对应。
+- 下载路径复用 Glider 的 forwarder 语法：`#priority=` 数值越大越先尝试，同优先级按声明顺序。`direct://` 明确表示直连；`socks5h://` 由 SOCKS 服务器解析目标域名。
+- **正常刷新周期、缓存 TTL、失败重试间隔是三个独立设置。** 有效缓存可以直接复用，读取不会延长有效期；部分失败后重试时，成功输入的有效缓存仍可复用。
+- 启动时若存在上次成功生成的节点文件，先恢复服务，再后台刷新；首次安装即使没有旧节点文件，也能获取订阅并开始转发。
+- 筛选采用区分大小写的字面子串匹配：SS 匹配节点名，SSR 匹配 group + remarks。订阅转换目前仅支持 SS/SSR；可识别但不支持的分享协议会统计并跳过。
+- Linux 下可用 `systemctl kill -s HUP glider` 请求名为 `glider` 的服务手动刷新，仍遵守缓存 TTL。Status 页面的 **Refresh now** 按钮只刷新页面显示的数据。
 
-### Existing static configurations and multi-instance migration
+### 从静态配置迁移与四实例部署
 
-Static `forward=` entries, ordinary includes and rule files remain supported. For a subscription-managed node file, replace its old `include=` entry with `subscription-output=`; **do not use both for the same file**. Disable the corresponding old script/cron updater before switching, and retain backups for rollback.
+静态 `forward=`、普通 `include=` 和规则文件仍然受支持。对于订阅管理的节点文件，将原来的 `include=` 改为 `subscription-output=`，**同一文件不能同时使用这两种声明**。切换前禁用对应的旧脚本/cron 更新任务，并保留备份以便回退。
 
-Place a shared `include=` before instance-specific settings. Includes expand at their declaration point; lists append in order, later scalars override earlier values, and CLI arguments are applied last. Missing ordinary include files remain errors.
+公共 `include=` 放在实例专有设置之前。include 在声明位置展开；列表按顺序追加，标量由后面的值覆盖，命令行参数最后应用。普通 include 文件缺失仍会报错。
 
-See the [complete configuration, migration and rollback guide](docs/native-subscriptions.md) and the [shared + asia/hk/jp/us examples](config/subscription).
+详见[完整配置、迁移与回退指南](docs/native-subscriptions.md)，以及[公共配置和 asia/hk/jp/us 四实例示例](config/subscription)。
 
-## Forwarder aliases
+## 节点名称
 
-Forwarder options use the existing `#OPTIONS` query syntax. Add `name=` to give a node a readable display name:
+在现有 forwarder 的 `#OPTIONS` 参数中加入 `name=`，即可设置便于辨认的显示名称：
 
 ```ini
 forward=trojan://user:pass@example.com:443#name=US-Trojan
@@ -75,11 +77,9 @@ forward=socks5://127.0.0.1:1080#priority=10&name=Local-SOCKS
 forward=anytls://password@example.com:443#name="AnyTLS US"
 ```
 
-Quoted names are accepted; surrounding quotes are removed for display.
+名称支持外层引号，显示时会移除。未设置 `name=` 时，仍使用原 forwarder 地址作为显示名称，兼容已有配置。
 
-Without `name=`, glider falls back to the original forwarder address, so existing configurations remain compatible.
-
-## LHA mode
+## LHA 模式
 
 ```ini
 strategy=lha
@@ -89,76 +89,78 @@ checklatencysamples=6
 checktolerance=50
 ```
 
-The v0.20.x releases added runtime visibility around LHA. v0.21.0 adds daily availability history; it does not change the LHA scheduler.
+v0.20.x 增加 LHA 运行状态展示，v0.21.0 增加每日可用率历史；这些观测功能没有改变 LHA 调度算法。
 
-After the first real connection, the log records the selected node:
+首次真实连接后，日志记录实际选中的节点：
 
 ```text
 [lha] main: selected tuic US (181ms)
 ```
 
-A later change is logged only when the selected forwarder changes:
+后续仅在选中节点发生变化时记录切换：
 
 ```text
 [lha] main: switch tuic US (260ms) -> hysteria UDP US (183ms)
 ```
 
-Before any traffic has passed through an LHA group, the WebUI intentionally does **not** guess a current node. It displays `--` and `Waiting for first connection`.
+某个 LHA 分组尚无真实流量时，Web 页面不会猜测当前节点，而是显示 `--` 和 `Waiting for first connection`。
 
-## WebUI
+## Web 管理界面
 
-Enable the web admin interface in the config:
+在配置中启用：
 
 ```ini
 web=:8888
 ```
 
-Then open:
+可访问以下页面与接口：
 
-- `/status` — forwarder health, latency, current LHA selection, and named subscription results with refresh timestamps
-- `/lha` — daily LHA availability by group/node, with best/worst time windows and latency waveforms
-- `/traffic` — traffic counters grouped by source IP
-- `/logs` — recent in-memory logs
-- `/api/status` — JSON forwarder and subscription status API
-- `/api/lha/history?date=YYYY-MM-DD` — daily LHA probe history and 15-minute node buckets
-- `/api/traffic` — JSON traffic API
-- `/api/logs?limit=100` — JSON log API
+- `/status`：节点健康状态、延迟、当前 LHA 节点，以及带标题和刷新时间的订阅结果。
+- `/lha`：分组/节点每日可用率、最佳/最差时间窗口及延迟波形。
+- `/traffic`：按来源 IP 分组的流量统计。
+- `/logs`：近期内存日志。
+- `/api/status`：节点与订阅状态 JSON 接口。
+- `/api/lha/history?date=YYYY-MM-DD`：每日 LHA 探测历史与 15 分钟节点统计。
+- `/api/traffic`：流量 JSON 接口。
+- `/api/logs?limit=100`：日志 JSON 接口。
 
-The WebUI is embedded into the glider binary; no separate web files or web server are required at runtime.
+Web 页面已嵌入二进制文件，运行时无需单独部署网页文件或 Web 服务器。
 
-### LHA history storage
+### LHA 历史存储
 
-History is appended to one `YYYY-MM-DD.jsonl` file per local date. Since v0.22.0, the default base directory is `/tmp/.glider-history`, with a separate `glider-lha-history-<id>` subdirectory for each instance. The stable instance ID is derived from the listener, Web/DNS address and service settings. On Windows, the default base uses the system temporary directory.
+历史按本地日期追加到 `YYYY-MM-DD.jsonl`。从 v0.22.0 起，Linux 默认基础目录为 `/tmp/.glider-history`，每个实例使用独立的 `glider-lha-history-<id>` 子目录。稳定实例 ID 由监听地址、Web/DNS 地址和服务设置生成。Windows 默认使用系统临时目录作为基础目录。
 
-Set a persistent base directory when history must survive cleanup or reboot:
+若需要在临时目录清理或重启后保留历史，可指定持久化基础目录：
 
 ```ini
 lha-history-dir=/var/lib/glider/history
 ```
 
-Relative `lha-history-dir` paths resolve from the main configuration directory. Existing history is not moved automatically.
+相对路径以主配置文件所在目录为基准。已有历史不会自动搬迁。
 
-- `GLIDER_LHA_HISTORY_PATH`, when nonempty, takes precedence over `lha-history-dir` and specifies the full instance history directory. Relative paths are resolved from Glider's working directory. Give each instance a different path when overriding this variable.
-- `GLIDER_LHA_HISTORY_RETENTION_DAYS` sets how many local dates to keep. The default is `30`; set it to `0` to disable automatic cleanup.
+- 非空的 `GLIDER_LHA_HISTORY_PATH` 环境变量优先于 `lha-history-dir`，指定完整的实例历史目录；其相对路径以 Glider 工作目录为基准。多个实例使用该变量时，应分别指定不同目录。
+- `GLIDER_LHA_HISTORY_RETENTION_DAYS` 设置保留的本地日期数量，默认 `30`；设为 `0` 关闭自动清理。
 
-Expired date files are removed at startup and when a new day's history file is opened. Cleanup only targets regular files named `YYYY-MM-DD.jsonl`.
+启动及打开新一天的历史文件时，会清理过期日期文件。仅清理文件名为 `YYYY-MM-DD.jsonl` 的普通文件。
 
-Node availability is the successful-check percentage. Group availability is the percentage of observed 15-minute windows in which at least one node passed its check. Windows with no probe data remain gaps in the timeline. The most stable window ranks availability first, then lower latency variation and lower average latency.
+节点可用率是健康检查成功次数的百分比。分组可用率是已观测的 15 分钟窗口中，至少一个节点检查成功的窗口占比。没有探测数据的时段保留为空白。最稳定窗口优先按可用率排名，再比较延迟波动和平均延迟。
 
-## Scheduling strategies
+## 调度策略
 
-| Strategy | Meaning |
+| 策略 | 含义 |
 | --- | --- |
-| `rr` | Round robin |
-| `ha` | High availability |
-| `lha` | Latency-based high availability |
-| `dh` | Destination hashing |
+| `rr` | 轮询 |
+| `ha` | 高可用 |
+| `lha` | 基于延迟的高可用 |
+| `dh` | 目标地址哈希 |
 
-## Protocols
+## 协议支持
 
-glider supports protocol conversion and chaining across a broad set of listeners and forwarders, including HTTP, SOCKS4/4A/5, Shadowsocks, Trojan, VLESS, VMess, SSH, TLS, WebSocket, KCP, Unix sockets, UDP/TCP tunnels, AnyTLS and others supported by the underlying project.
+Glider 支持多种监听、转发、协议转换和代理链，包括 HTTP、SOCKS4/4A/5、Shadowsocks、Trojan、VLESS、VMess、SSH、TLS、WebSocket、KCP、Unix socket、UDP/TCP 隧道、AnyTLS 等底层项目支持的协议。
 
-For detailed protocol URI syntax and configuration examples, see the files under [`config/examples`](config/examples) and use:
+**转发协议支持与订阅转换支持不同：v0.22.0 的原生订阅转换仅支持 SS/SSR。**
+
+详细协议 URI 语法与配置示例见 [config/examples](config/examples)，也可运行：
 
 ```bash
 glider -scheme all
@@ -166,29 +168,29 @@ glider -example
 glider -help
 ```
 
-## Build from source
+## 从源码构建
 
-Go version requirements are defined by `go.mod`. A current stable Go toolchain is recommended.
+Go 版本要求见 `go.mod`，建议使用当前稳定版工具链。
 
 ```bash
 go build -trimpath -ldflags="-s -w" -o glider .
 ```
 
-On Windows, clone the repository and double-click:
+Windows 下克隆仓库后，可以双击：
 
 ```text
 build-windows.bat
 ```
 
-The executable is written to:
+生成文件位于：
 
 ```text
 build\glider.exe
 ```
 
-The `build/` directory is ignored by Git.
+`build/` 已加入 Git 忽略列表。
 
-## Basic usage
+## 基本用法
 
 ```bash
 glider -verbose -listen :8443
@@ -196,21 +198,21 @@ glider -verbose -listen :8443 -forward socks5://127.0.0.1:1080
 glider -verbose -config glider.conf client
 ```
 
-## Compatibility
+## 兼容性
 
-The `name=` option is display metadata only. Existing forwarder URLs without a name continue to work and use their address as the display label.
+`name=` 仅为显示元数据。没有名称的旧 forwarder URL 继续有效，并使用地址作为显示名称。
 
-The v0.20.x and v0.21.0 LHA changes added observability. v0.22.0 adds subscription-managed runtime membership changes while retaining the existing scheduling strategies. Ordinary static single-node groups still skip health checks; subscription-managed main groups check even a single node so later 1↔N updates remain supported. History storage failures do not stop the proxy from running.
+v0.20.x 与 v0.21.0 的 LHA 改动增加观测能力；v0.22.0 增加订阅节点的运行时更新，保留现有调度策略。普通静态单节点分组仍跳过健康检查；订阅管理的主分组即使只有一个节点也进行健康检查，以支持后续 1↔N 节点更新。历史存储失败不会阻止代理运行。
 
-## Changelog
+## 更新记录
 
-See [CHANGELOG.md](CHANGELOG.md).
+见 [CHANGELOG.md](CHANGELOG.md)。
 
-## Credits
+## 致谢
 
-- Original project: [nadoo/glider](https://github.com/nadoo/glider)
-- Fork lineage / WebUI work: [0xec/glider](https://github.com/0xec/glider)
+- 原始项目：[nadoo/glider](https://github.com/nadoo/glider)
+- Fork 来源与 WebUI 工作：[0xec/glider](https://github.com/0xec/glider)
 
-## License
+## 许可证
 
-This project retains the license of the upstream glider project. See [LICENSE](LICENSE).
+沿用上游项目许可证，见 [LICENSE](LICENSE)。
