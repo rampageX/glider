@@ -11,24 +11,30 @@ import (
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/rule"
 	"github.com/nadoo/glider/stats"
+	"github.com/nadoo/glider/subscription"
 )
 
 //go:embed static/*
 var staticFiles embed.FS
 
 type Server struct {
-	addr   string
-	proxy  *rule.Proxy
-	static fs.FS
+	addr          string
+	proxy         *rule.Proxy
+	static        fs.FS
+	subscriptions func() subscription.Status
 }
 
-func New(addr string, proxy *rule.Proxy) *Server {
+func New(addr string, proxy *rule.Proxy, providers ...func() subscription.Status) *Server {
 	static, err := fs.Sub(staticFiles, "static")
 	if err != nil {
 		panic(err)
 	}
 
-	return &Server{addr: addr, proxy: proxy, static: static}
+	s := &Server{addr: addr, proxy: proxy, static: static}
+	if len(providers) > 0 {
+		s.subscriptions = providers[0]
+	}
+	return s
 }
 
 func (s *Server) ListenAndServe() {
@@ -85,8 +91,14 @@ func (s *Server) serveAsset(name, contentType string) gin.HandlerFunc {
 }
 
 func (s *Server) handleStatus(c *gin.Context) {
+	state := subscription.Status{Inputs: []subscription.InputStatus{}}
+	if s.subscriptions != nil {
+		state = s.subscriptions()
+	}
+	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, gin.H{
-		"groups": s.proxy.StatusSnapshot(),
+		"groups":        s.proxy.StatusSnapshot(),
+		"subscriptions": state,
 	})
 }
 

@@ -50,6 +50,11 @@
     .node-name { font-weight:600; }
     .node-addr { color:var(--muted); font-size:12px; margin-top:3px; word-break:break-all; }
     .current-pill { display:inline-block; margin-left:8px; padding:2px 7px; border-radius:999px; background:rgba(56,189,248,.18); color:#7dd3fc; font-size:10px; font-weight:800; letter-spacing:.05em; vertical-align:middle; }
+    .subscription-section{margin-bottom:20px;padding:22px;overflow:hidden}
+    .subscription-url{color:var(--muted);font-size:12px;margin-top:5px;overflow-wrap:anywhere}
+    .subscription-note{color:var(--muted);font-size:12px;margin-top:6px}
+    .badge.waiting{background:rgba(56,189,248,.12);color:#7dd3fc;border-color:rgba(56,189,248,.28)}
+    .subscription-section td{vertical-align:top}
     .empty { padding:42px 20px; text-align:center; color:var(--muted); }
     @media(max-width:720px){ .summary{grid-template-columns:repeat(2,minmax(0,1fr))} .group{padding:18px} }
     @media(max-width:560px){ .summary{grid-template-columns:1fr} }
@@ -85,12 +90,14 @@
         </div>
       </section>
       <section class="summary" id="summary"></section>
+      <section class="panel subscription-section" id="subscriptions" hidden></section>
       <section class="groups" id="groups"></section>
     </section>
   </main>
 
   <script>
     const groupsEl=document.getElementById('groups');
+    const subscriptionsEl=document.getElementById('subscriptions');
     const summaryEl=document.getElementById('summary');
     const updatedAtEl=document.getElementById('updated-at');
     const refreshButton=document.getElementById('refresh-btn');
@@ -105,6 +112,28 @@
       const enabled=groups.reduce((n,g)=>n+g.enabled_count,0);
       const lhaGroups=groups.filter(g=>g.strategy==='lha').length;
       summaryEl.innerHTML=[card('Groups',groups.length),card('Healthy Groups',ok),card('Enabled Forwarders',enabled),card('LHA Groups',lhaGroups),card('Total Forwarders',total)].join('');
+    }
+    function formatTime(value){if(!value)return '—';const date=new Date(value);return Number.isNaN(date.getTime())?'—':date.toLocaleString();}
+    function renderSubscriptions(state){
+      const inputs=state?.inputs||[];
+      subscriptionsEl.hidden=!inputs.length;
+      if(!inputs.length){subscriptionsEl.innerHTML='';return;}
+      const applyLabels={PENDING:'等待首次刷新',UPDATED:'已应用新节点',UNCHANGED:'内容未变化',RETAINED_EMPTY:'筛选为空，保留现有节点',RETAINED_NO_INPUT:'订阅均失败，保留现有节点',VALIDATION_FAILED:'候选校验失败，保留现有节点',PERSIST_FAILED:'文件写入失败，保留现有节点'};
+      const failed=inputs.filter(input=>input.result==='FAILED').length;
+      const summary=state.refreshing?'正在刷新订阅…':`${failed?`${failed} 个订阅失败 · `:''}${applyLabels[state.apply_result]||'等待刷新'}`;
+      const rows=inputs.map(input=>{
+        const success=input.result==='SUCCESS';
+        const badge=input.checking?'waiting':success?'ok':input.result==='FAILED'?'bad':'waiting';
+        const label=input.checking?'刷新中':success?'成功':input.result==='FAILED'?'失败':'等待';
+        const source=input.source==='cache'?'有效缓存':input.source==='download'?'联网下载':'';
+        const previous=input.checking?`<div class="subscription-note">上次结果：${success?'成功':input.result==='FAILED'?'失败':'尚无'}</div>`:'';
+        return `<tr><td><div class="node-name">订阅「${escapeHtml(input.title)}」</div><div class="subscription-url">${escapeHtml(input.url)}</div><div class="subscription-note">ID: ${escapeHtml(input.id)}</div></td>
+          <td><span class="badge ${badge}">${label}</span>${previous}<div class="subscription-note">${escapeHtml(source)}${success?` · 匹配 ${Number(input.matched_nodes)||0} 节点`:''}</div></td>
+          <td>${escapeHtml(formatTime(input.checked_at))}</td><td>${escapeHtml(formatTime(input.last_success_at))}</td></tr>`;
+      }).join('');
+      subscriptionsEl.innerHTML=`<div class="group-head"><div><h2 class="group-name">Subscriptions · 订阅</h2><div class="meta"><span>${escapeHtml(summary)}</span><span>下次刷新：${escapeHtml(formatTime(state.next_refresh_at))}</span></div></div></div>
+        <div class="table-wrap"><table><thead><tr><th>订阅 / URL（已脱敏）</th><th>最近结果</th><th>检查时间</th><th>上次成功下载</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="subscription-note">成功表示本次输入可用；缓存命中不代表重新下载。上次成功下载保留原下载时间，失败不会将它清空。URL 的路径及参数已隐藏。</div>`;
     }
     function renderGroups(groups){
       if(!groups.length){groupsEl.innerHTML='<section class="panel empty">No forward groups found.</section>';return;}
@@ -138,9 +167,9 @@
         if(!response.ok)throw new Error(`HTTP ${response.status}`);
         const data=await response.json();
         const groups=data.groups||[];
-        renderSummary(groups);renderGroups(groups);
+        renderSummary(groups);renderSubscriptions(data.subscriptions);renderGroups(groups);
         updatedAtEl.textContent=`Updated at ${new Date().toLocaleString()}`;
-      }catch(error){groupsEl.innerHTML=`<section class="panel empty">Failed to load status: ${escapeHtml(error.message)}</section>`;}
+      }catch(error){subscriptionsEl.hidden=true;groupsEl.innerHTML=`<section class="panel empty">Failed to load status: ${escapeHtml(error.message)}</section>`;}
     }
     function resetTimer(){if(timerId)clearInterval(timerId);timerId=setInterval(refresh,Number(refreshRate.value));}
     refreshButton.addEventListener('click',refresh);

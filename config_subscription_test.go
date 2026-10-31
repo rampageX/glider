@@ -39,9 +39,16 @@ func TestShippedSubscriptionConfigurations(t *testing.T) {
 			if !strings.HasSuffix(c.Subscription.Output, "glider_db_"+region+"_ssr.conf") {
 				t.Fatal(c.Subscription.Output)
 			}
-			if c.HistoryDir!="/tmp/.glider-history" {t.Fatal(c.HistoryDir)}
- if c.Subscription.CacheDir!="/tmp/.subscription-cache" {t.Fatal(c.Subscription.CacheDir)}
- if c.Subscription.TTL != 3600 || c.Subscription.Interval != 3600 {
+			if c.HistoryDir != "/tmp/.glider-history" {
+				t.Fatal(c.HistoryDir)
+			}
+			if c.Subscription.CacheDir != "/tmp/.subscription-cache" {
+				t.Fatal(c.Subscription.CacheDir)
+			}
+			if len(c.Subscription.Titles) != 2 || c.Subscription.Titles[0] != "订阅一" || c.Subscription.RetryInterval != 7200 {
+				t.Fatal("titles/retry not loaded")
+			}
+			if c.Subscription.TTL != 3600 || c.Subscription.Interval != 3600 {
 				t.Fatal("limits not loaded")
 			}
 		})

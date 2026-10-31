@@ -2,19 +2,23 @@ package subscription
 
 import (
 	"errors"
- "os"
 	"github.com/nadoo/conflag"
+	"os"
 	"path/filepath"
 	"time"
 )
 
 type Config struct {
+	Titles                                           []string
 	URLs, Matches, Excludes, Paths                   []string
 	Region, Output, CacheDir                         string
 	Interval, TTL, ConnectTimeout, Timeout, MaxBytes int
+	RetryInterval                                    int
 }
 
 func RegisterFlags(f *conflag.Conflag, c *Config) {
+	f.StringSliceVar(&c.Titles, "subscription-title", nil, "optional subscription titles, one per subscription in the same order")
+	f.IntVar(&c.RetryInterval, "subscription-retry-interval", 7200, "retry failed refresh after seconds; 0 disables extra retries")
 	f.StringSliceVar(&c.URLs, "subscription", nil, "SS/SSR subscription URL (repeatable)")
 	f.StringSliceVar(&c.Matches, "subscription-match", nil, "literal case-sensitive include keyword (OR)")
 	f.StringSliceVar(&c.Excludes, "subscription-exclude", []string{"遊戲"}, "literal exclude keyword (repeatable; empty disables default)")
@@ -37,6 +41,12 @@ func (c *Config) Resolve(dir string) error {
 	}
 	if c.Output == "" {
 		return errors.New("subscription-output is required")
+	}
+	if len(c.Titles) != 0 && len(c.Titles) != len(c.URLs) {
+		return errors.New("subscription-title count must match subscription count")
+	}
+	if c.RetryInterval < 0 {
+		return errors.New("subscription-retry-interval cannot be negative")
 	}
 	if c.Interval < 1 || c.TTL < 0 || c.ConnectTimeout < 1 || c.Timeout < 1 || c.MaxBytes < 1 {
 		return errors.New("invalid subscription limits")

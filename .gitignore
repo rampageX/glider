@@ -47,3 +47,4 @@ glider
 !/pkg/configfile/*_test.go
 !/subscription/*_test.go
 !/rule/update_test.go
+!/web/subscription_test.go

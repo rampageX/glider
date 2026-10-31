@@ -1,10 +1,13 @@
 # Copy to /root/cfg/subscription-common.conf and chmod 600.
 # Replace placeholders locally; never publish real URLs/tokens.
+subscription-title=订阅一
 subscription=https://subscription.example.invalid/REPLACE_TOKEN_1
+subscription-title=订阅二
 subscription=https://subscription.example.invalid/REPLACE_TOKEN_2
 subscription-cache-dir=/tmp/.subscription-cache
 subscription-cache-ttl=3600
 subscription-interval=3600
+subscription-retry-interval=7200
 subscription-connect-timeout=3
 subscription-timeout=15
 subscription-max-bytes=8388608

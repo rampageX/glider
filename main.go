@@ -95,7 +95,11 @@ func main() {
 
 	pxy.Check()
 	if config.Web != "" {
-		go web.New(config.Web, pxy).ListenAndServe()
+		var provider func() subscription.Status
+		if manager != nil {
+			provider = manager.Snapshot
+		}
+		go web.New(config.Web, pxy, provider).ListenAndServe()
 	}
 
 	for _, listen := range config.Listens {

@@ -17,13 +17,22 @@ import (
 )
 
 type Manager struct {
-	conf  Config
-	paths []route
-	mu    sync.Mutex
-	apply func([]string, func() error) (bool, error)
+	conf       Config
+	paths      []route
+	mu         sync.Mutex
+	statusMu   sync.RWMutex
+	status     Status
+	needsRetry bool
+	apply      func([]string, func() error) (bool, error)
 }
 
 func New(c Config, apply func([]string, func() error) (bool, error)) (*Manager, error) {
+	if len(c.Titles) != 0 && len(c.Titles) != len(c.URLs) {
+		return nil, errors.New("subscription-title count must match subscription count")
+	}
+	if c.Interval < 1 || c.RetryInterval < 0 {
+		return nil, errors.New("invalid refresh/retry interval")
+	}
 	paths, e := routes(c.Paths)
 	if e != nil {
 		return nil, e
@@ -33,7 +42,9 @@ func New(c Config, apply func([]string, func() error) (bool, error)) (*Manager, 
 			return nil, errors.New("invalid subscription URL")
 		}
 	}
-	return &Manager{conf: c, paths: paths, apply: apply}, nil
+	m := &Manager{conf: c, paths: paths, apply: apply}
+	m.initStatus()
+	return m, nil
 }
 func validURL(s string) bool {
 	u, e := url.Parse(s)
@@ -42,22 +53,31 @@ func validURL(s string) bool {
 
 // Run serializes startup, timer and signal-triggered refreshes. Triggers coalesce.
 func (m *Manager) Run(ctx context.Context, triggers <-chan os.Signal) {
-	m.Refresh(ctx)
-	timer := time.NewTicker(m.conf.duration(m.conf.Interval))
-	defer timer.Stop()
+	defer m.setNext(nil)
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-timer.C:
-		case <-triggers:
-		}
 		if ctx.Err() != nil {
 			return
 		}
 		m.Refresh(ctx)
+		if ctx.Err() != nil {
+			return
+		}
+		delay := m.nextDelay()
+		next := time.Now().Add(delay)
+		m.setNext(&next)
+		log.F("[subscription] next refresh in %d seconds", int(delay/time.Second))
+		timer := time.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return
+		case <-timer.C:
+		case <-triggers:
+			timer.Stop()
+		}
 	}
 }
+
 func Validate(defs []string) error {
 	for _, s := range defs {
 		if _, e := rule.ForwarderFromURL(s, "", time.Second, time.Second); e != nil {
@@ -75,13 +95,18 @@ func (m *Manager) Refresh(ctx context.Context) {
 	if ctx.Err() != nil {
 		return
 	}
+	m.beginRefresh()
+	defer m.endRefresh()
 	var all []Node
 	successes := 0
 	for i, raw := range m.conf.URLs {
 		if ctx.Err() != nil {
 			return
 		}
-		nodes, hit, skipped, e := m.input(ctx, raw)
+		m.beginInput(i)
+		result, e := m.fetchInput(ctx, raw)
+		m.endInput(i, result, e)
+		nodes, hit, skipped := result.nodes, result.hit, result.skipped
 		if skipped > 0 {
 			log.F("[subscription] input %d skipped %d unsupported nodes (scheme/plugin/cipher/protocol/obfs)", i+1, skipped)
 		}
@@ -99,6 +124,11 @@ func (m *Manager) Refresh(ctx context.Context) {
 	}
 	defs := Filter(all, m.conf.Matches, m.conf.Excludes)
 	if successes == 0 || len(defs) == 0 {
+		result := "RETAINED_EMPTY"
+		if successes == 0 {
+			result = "RETAINED_NO_INPUT"
+		}
+		m.setApply(result, false)
 		log.F("[subscription] no usable candidate; retaining current nodes")
 		return
 	}
@@ -106,6 +136,7 @@ func (m *Manager) Refresh(ctx context.Context) {
 		return
 	}
 	if e := Validate(defs); e != nil {
+		m.setApply("VALIDATION_FAILED", true)
 		log.F("[subscription] candidate invalid; retaining current nodes")
 		return
 	}
@@ -117,13 +148,16 @@ func (m *Manager) Refresh(ctx context.Context) {
 		return atomicWrite(m.conf.Output, data)
 	})
 	if e != nil {
+		m.setApply("PERSIST_FAILED", true)
 		log.F("[subscription] commit failed; retaining current nodes")
 		return
 	}
 	if !changed {
+		m.setApply("UNCHANGED", false)
 		log.F("[subscription] content unchanged; nodes and file retained")
 		return
 	}
+	m.setApply("UPDATED", false)
 	if successes < len(m.conf.URLs) {
 		log.F("[subscription] partial success: %d/%d inputs, applied %d nodes", successes, len(m.conf.URLs), len(defs))
 	} else {
@@ -137,44 +171,58 @@ type cacheEntry struct {
 }
 
 func cacheKey(raw string) string { h := sha256.Sum256([]byte(raw)); return hex.EncodeToString(h[:]) }
+
+type inputResult struct {
+	nodes   []Node
+	hit     bool
+	skipped int
+	at      time.Time
+}
+
+// Retain the small input interface used by existing cache tests.
 func (m *Manager) input(ctx context.Context, raw string) ([]Node, bool, int, error) {
+	r, e := m.fetchInput(ctx, raw)
+	return r.nodes, r.hit, r.skipped, e
+}
+func (m *Manager) fetchInput(ctx context.Context, raw string) (inputResult, error) {
 	path := filepath.Join(m.conf.CacheDir, cacheKey(raw)+".json")
-	read := func() ([]Node, int, error) {
+	read := func() (inputResult, error) {
 		b, e := os.ReadFile(path)
 		if e != nil {
-			return nil, 0, e
+			return inputResult{}, e
 		}
 		if len(b) > m.conf.MaxBytes*2+4096 {
-			return nil, 0, errors.New("cache too large")
+			return inputResult{}, errors.New("cache too large")
 		}
 		var entry cacheEntry
 		if json.Unmarshal(b, &entry) != nil {
-			return nil, 0, errors.New("invalid cache")
+			return inputResult{}, errors.New("invalid cache")
 		}
 		age := time.Since(entry.At)
 		if age < 0 || age >= m.conf.duration(m.conf.TTL) {
-			return nil, 0, errors.New("expired cache")
+			return inputResult{}, errors.New("expired cache")
 		}
-		return Parse(entry.Body)
+		n, s, e := Parse(entry.Body)
+		return inputResult{nodes: n, hit: true, skipped: s, at: entry.At}, e
 	}
-	if n, s, e := read(); e == nil {
-		return n, true, s, nil
+	if r, e := read(); e == nil {
+		return r, nil
 	}
 	if e := os.MkdirAll(m.conf.CacheDir, 0700); e != nil {
-		return nil, false, 0, e
+		return inputResult{}, e
 	}
 	unlock, e := lock(ctx, path+".lock")
 	if e != nil {
-		return nil, false, 0, e
+		return inputResult{}, e
 	}
 	defer unlock()
-	if n, s, e := read(); e == nil {
-		return n, true, s, nil
+	if r, e := read(); e == nil {
+		return r, nil
 	}
 	skipped := 0
 	for index, r := range m.paths {
 		if ctx.Err() != nil {
-			return nil, false, 0, ctx.Err()
+			return inputResult{}, ctx.Err()
 		}
 		debugf(m.conf, "input=%s route=%d via=%s stage=get-start", cacheKey(raw)[:8], index+1, routeLabel(r.definition))
 		b, e := download(ctx, raw, r, m.conf)
@@ -203,12 +251,12 @@ func (m *Manager) input(ctx context.Context, raw string) ([]Node, bool, int, err
 		entry := cacheEntry{At: time.Now(), Body: b}
 		data, e := json.Marshal(entry)
 		if e != nil {
-			return nil, false, 0, e
+			return inputResult{}, e
 		}
 		if e = atomicWrite(path, data); e != nil {
-			return nil, false, 0, e
+			return inputResult{}, e
 		}
-		return n, false, s, nil
+		return inputResult{nodes: n, skipped: s, at: entry.At}, nil
 	}
-	return nil, false, skipped, errors.New("all GET routes failed")
+	return inputResult{skipped: skipped}, errors.New("all GET routes failed")
 }
