@@ -93,7 +93,7 @@ forward=ssr://aes-128-cfb:example-password@ssr.example.invalid:443?obfs=http_sim
 
 分享链接被规范化为 Glider 原生 URL，凭据和参数只解码一次再编码；名称使用 `#name=`。
 编码后的逗号不会被当作转发链分隔符。名称的首尾空格和引号也保留；
-静态配置中的 name 按 URL query 原样解码，不再自动去掉人为包裹的引号。
+URL 编码的 name 按 query 原样解码；未编码的手写 name 仍兼容旧版首尾空白/包裹引号处理。
 普通静态 forward 仍使用原格式。
 SS 插件、未知扩展、当前不支持的算法/SSR 协议或混淆明确计数并跳过。
 其他格式损坏的节点导致整个订阅拒绝，不接受其余半份节点。

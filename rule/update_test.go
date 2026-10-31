@@ -144,3 +144,12 @@ func TestHealthExitAndConcurrentSnapshots(t *testing.T) {
 		t.Fatal("checks survived close")
 	}
 }
+
+func TestLegacyAndEncodedNames(t *testing.T) {
+	for _, tc := range []struct{ value, want string }{{`"legacy"`, "legacy"}, {"%20%27literal%27%20", " 'literal' "}} {
+		f, e := ForwarderFromURL("direct://#name="+tc.value, "", time.Second, time.Second)
+		if e != nil || f.Name() != tc.want {
+			t.Fatalf("legacy/encoded name %q %v", f.Name(), e)
+		}
+	}
+}

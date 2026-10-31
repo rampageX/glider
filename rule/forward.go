@@ -87,6 +87,20 @@ func (f *Forwarder) parseOption(option string) error {
 	f.SetPriority(uint32(priority))
 	f.intface = query.Get("interface")
 	f.name = query.Get("name")
+	// Encoded names are literal (subscriptions always URL-encode them). Keep
+	// legacy trimming for handwritten, unescaped #name="..." configurations.
+	encodedName := false
+	for _, part := range strings.Split(option, "&") {
+		key, value, ok := strings.Cut(part, "=")
+		if ok && key == "name" && strings.ContainsAny(value, "%+") {
+			encodedName = true
+			break
+		}
+	}
+	if !encodedName {
+		f.name = strings.Trim(strings.TrimSpace(f.name), "\"'")
+	}
+
 	return err
 }
 
