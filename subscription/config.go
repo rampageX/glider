@@ -2,6 +2,7 @@ package subscription
 
 import (
 	"errors"
+ "os"
 	"github.com/nadoo/conflag"
 	"path/filepath"
 	"time"
@@ -20,7 +21,7 @@ func RegisterFlags(f *conflag.Conflag, c *Config) {
 	f.StringSliceVar(&c.Paths, "subscription-proxy", []string{"direct://"}, "download forwarder URL, larger #priority first; stable ties")
 	f.StringVar(&c.Region, "subscription-region", "", "instance region label")
 	f.StringVar(&c.Output, "subscription-output", "", "managed forward file; DO NOT include it")
-	f.StringVar(&c.CacheDir, "subscription-cache-dir", "subscription-cache", "shared raw subscription cache directory")
+	f.StringVar(&c.CacheDir, "subscription-cache-dir", filepath.Join(os.TempDir(), ".subscription-cache"), "shared raw subscription cache directory")
 	f.IntVar(&c.Interval, "subscription-interval", 3600, "refresh interval seconds, independent of cache TTL")
 	f.IntVar(&c.TTL, "subscription-cache-ttl", 3600, "raw cache validity seconds")
 	f.IntVar(&c.ConnectTimeout, "subscription-connect-timeout", 3, "download connection/handshake timeout seconds")

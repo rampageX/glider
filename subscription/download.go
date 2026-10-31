@@ -3,6 +3,7 @@ package subscription
 import (
 	"context"
 	"errors"
+ "fmt"
 	"io"
 	"net"
 	"net/http"
@@ -99,7 +100,7 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	defer cancel()
 	base, e := proxy.NewDirect(r.intface, c.duration(c.ConnectTimeout), 0)
 	if e != nil {
-		return nil, e
+		return nil, errors.New("stage=dial reason=invalid-interface")
 	}
 	// Build with a bounded base rather than the runtime Proxy: download requests
 	// never recursively invoke subscription refresh or acquire its cache lock.
@@ -131,18 +132,20 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	req.Header.Set("User-Agent", "Glider-subscription/1")
 	resp, e := client.Do(req)
 	if e != nil {
-		return nil, errors.New("GET failed")
+		return nil, fmt.Errorf("stage=get reason=%s",networkReason(e))
 	}
 	defer resp.Body.Close()
+ debugf(c,"input=%s route=%s stage=response status=%d media=%s declared-bytes=%d",cacheKey(raw)[:8],routeLabel(r.definition),resp.StatusCode,mediaKind(resp.Header.Get("Content-Type")),resp.ContentLength)
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("GET status not 200")
+		return nil, fmt.Errorf("stage=response status=%d",resp.StatusCode)
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, int64(c.MaxBytes)+1))
 	if e != nil {
-		return nil, errors.New("incomplete response")
+		return nil, fmt.Errorf("stage=read reason=%s",networkReason(e))
 	}
 	if len(b) > c.MaxBytes {
 		return nil, errors.New("response limit exceeded")
 	}
-	return b, nil
+	debugf(c,"input=%s route=%s stage=body %s",cacheKey(raw)[:8],routeLabel(r.definition),bodySummary(b))
+ return b, nil
 }

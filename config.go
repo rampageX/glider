@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+ "path/filepath"
 
 	"github.com/nadoo/conflag"
 
@@ -35,6 +36,7 @@ type Config struct {
 	DNS       string
 	DNSConfig dns.Config
 	Web       string
+ HistoryDir string
 
 	rules []*rule.Config
 
@@ -91,7 +93,8 @@ check=disable: disable health check`)
 	flag.BoolVar(&conf.DNSConfig.CacheLog, "dnscachelog", false, "show query log of dns cache")
 	flag.BoolVar(&conf.DNSConfig.NoAAAA, "dnsnoaaaa", false, "disable AAAA query")
 	flag.StringSliceUniqVar(&conf.DNSConfig.Records, "dnsrecord", nil, "custom dns record, format: domain/ip")
-	flag.StringVar(&conf.Web, "web", ":8888", "web admin listen address")
+	flag.StringVar(&conf.HistoryDir,"lha-history-dir",filepath.Join(os.TempDir(),".glider-history"),"LHA history base directory (instance subdirectories; relative to main config)")
+ flag.StringVar(&conf.Web, "web", ":8888", "web admin listen address")
 
 	// service configs
 	flag.StringSliceUniqVar(&conf.Services, "service", nil, "run specified services, format: SERVICE_NAME[,SERVICE_CONFIG]")
@@ -136,7 +139,8 @@ check=disable: disable health check`)
 	if err := conf.Subscription.Resolve(flag.ConfDir()); err != nil {
 		log.Fatal(err)
 	}
-	loadRules(conf)
+	if !filepath.IsAbs(conf.HistoryDir) { conf.HistoryDir=filepath.Join(flag.ConfDir(),conf.HistoryDir) }
+ loadRules(conf)
 	return conf
 }
 

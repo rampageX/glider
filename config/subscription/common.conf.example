@@ -2,7 +2,7 @@
 # Replace placeholders locally; never publish real URLs/tokens.
 subscription=https://subscription.example.invalid/REPLACE_TOKEN_1
 subscription=https://subscription.example.invalid/REPLACE_TOKEN_2
-subscription-cache-dir=/root/cfg/subscription-cache
+subscription-cache-dir=/tmp/.subscription-cache
 subscription-cache-ttl=3600
 subscription-interval=3600
 subscription-connect-timeout=3
@@ -16,3 +16,6 @@ subscription-proxy=socks5h://127.0.0.1:7575#priority=80
 subscription-proxy=socks5h://127.0.0.1:7776#priority=70
 subscription-proxy=socks5h://127.0.0.1:7777#priority=60
 subscription-proxy=socks5h://127.0.0.1:7778#priority=50
+
+# Per-instance history subdirectories are created below this base.
+lha-history-dir=/tmp/.glider-history

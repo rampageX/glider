@@ -30,7 +30,7 @@ Web 端口是示例，部署时保留已有端口。也保留已有 listen、规
 | subscription-exclude | 遊戲 | 可重复；任意非空关键词命中就排除；显式设置替代默认，可用空值关闭排除 |
 | subscription-output | 必填 | 本实例唯一的生成文件，同时是最后成功应用节点快照 |
 | subscription-proxy | direct:// | 可重复；显式配置后替代默认列表，不隐式添加直连 |
-| subscription-cache-dir | subscription-cache | 四实例应设置为同一绝对目录 |
+| subscription-cache-dir | /tmp/.subscription-cache (Windows: TEMP 下同名目录) | 四实例应设置为同一绝对目录 |
 | subscription-cache-ttl | 3600 | 原始订阅新鲜度秒数；0 表示每次刷新都下载 |
 | subscription-interval | 3600 | 后台刷新周期秒数，与 TTL 独立，必须大于 0 |
 | subscription-connect-timeout | 3 | 每条路径底层 TCP 连接超时秒数，必须大于 0 |
@@ -170,3 +170,30 @@ LHA 当前选择、Web 状态和节点域名直连路由同步更新；历史记
 
 源码及本地/CI 测试不能代替 N1 验证：真实订阅服务、PC/本机实际六条路径、SS/SSR 服务端互通、
 ARM64 运行表现、systemd 配置以及实网长连接连续性均由 N1 实机确认。此分支不发布正式 Release。
+
+## 诊断版：跟随 -verbose
+
+无需新增开关，原命令加 `-verbose` 即可。通过真实订阅 GET 检查 7373，
+日志列出路径编号及代理 IP/端口、HTTP 状态、已知响应类型、字节数、
+明文/Base64/HTML/JSON-like 类型、SS/SSR/其他行计数，以及解析失败阶段和行号。
+不会打印响应正文、原始 URL、重定向地址、token、密码或任何节点参数值。
+错误仅输出固定类别，网络错误区分超时、DNS、连接拒绝及部分 TLS 原因；
+无法安全细分的代理错误统一标记 network-proxy-or-tls-failed。
+当前版本不改变解析接受规则，先收集错误证据，不把格式损坏订阅的一部分当作成功输入。
+
+例如在确认 systemd 原实例已停止、端口未被占用后：
+```sh
+/usr/local/sbin/glider -config /root/cfg/glider.conf -verbose
+```
+若保留旧快照可正常服务，保留它即可；快照恢复不会阻止后台订阅 GET。
+有效缓存命中不会联网，排查真实 GET 时可临时设置 subscription-cache-ttl=0，
+完成后恢复 3600。不要同时启动两个使用相同监听端口/输出文件的进程。
+
+缓存默认改为 `/tmp/.subscription-cache`（使用系统临时目录，Windows 对应 TEMP），
+显式 subscription-cache-dir 始终优先；已有设置 /tmp/.subscription-cache 可直接继续使用。
+LHA history 新增 `lha-history-dir=/tmp/.glider-history`，下面仍按实例 ID 分目录隔离；
+相对路径相对于主配置目录。兼容旧环境变量 GLIDER_LHA_HISTORY_PATH，其非空时优先，
+并直接指定完整实例目录，因此四实例使用该环境变量时必须各自指定不同目录。
+不会自动搬移或删除 cfg 下原有 history；如需旧历史，停服务后将原目录复制到新位置，
+或显式 lha-history-dir 指回旧基目录。/tmp 重启可能清空，持久历史请选择其他目录。
+节点输出文件保持原 subscription-output 路径，独立于临时缓存/history。

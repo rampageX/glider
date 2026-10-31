@@ -42,7 +42,7 @@ func main() {
 			log.F("[subscription] no valid snapshot; waiting for subscription (fail closed)")
 		}
 	}
-	if err := stats.InitAvailabilityStore(flag.ConfDir(), lhaHistoryInstanceID(config)); err != nil {
+	if err := stats.InitAvailabilityStore(config.HistoryDir, lhaHistoryInstanceID(config)); err != nil {
 		log.F("[lha-history] historical availability will not be persisted: %s", err)
 	} else {
 		defer stats.CloseAvailabilityStore()
