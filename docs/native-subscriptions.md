@@ -179,7 +179,7 @@ ARM64 运行表现、systemd 配置以及实网长连接连续性均由 N1 实�
 不会打印响应正文、原始 URL、重定向地址、token、密码或任何节点参数值。
 错误仅输出固定类别，网络错误区分超时、DNS、连接拒绝及部分 TLS 原因；
 无法安全细分的代理错误统一标记 network-proxy-or-tls-failed。
-当前版本不改变解析接受规则，先收集错误证据，不把格式损坏订阅的一部分当作成功输入。
+解析规则见下方混合订阅说明；格式损坏的 SS/SSR 仍导致整份订阅失败。
 
 例如在确认 systemd 原实例已停止、端口未被占用后：
 ```sh
@@ -197,3 +197,23 @@ LHA history 新增 `lha-history-dir=/tmp/.glider-history`，下面仍按实例 I
 不会自动搬移或删除 cfg 下原有 history；如需旧历史，停服务后将原目录复制到新位置，
 或显式 lha-history-dir 指回旧基目录。/tmp 重启可能清空，持久历史请选择其他目录。
 节点输出文件保持原 subscription-output 路径，独立于临时缓存/history。
+
+## 混合订阅中的非节点行
+
+Base64 解码后和逐行明文输入均允许 UTF-8 BOM、空行、以 # / ; / // 开头的注释，
+以及 MAX=无符号十进制整数、STATUS=说明、REMARKS=说明 元信息行。这些行不是节点，不参加筛选。
+识别 VMess、VLESS、Trojan、Hysteria/Hysteria2/hy2、TUIC、WireGuard、Snell 分享链接，
+按不支持的协议明确计数跳过；本版不转换这些协议。SS/SSR 的顺序及重复项仍保留。
+未知文本、未知 scheme、非法 MAX 数字、损坏 SS/SSR 均继续整份拒绝，不接纳半份结果。
+仅含元信息或不支持协议而没有任何有效 SS/SSR 的输入也不会作为成功缓存或清空运行节点。
+
+-verbose 的 body 摘要新增 classes= 固定类别计数，包括 comment、metadata-max/status/remarks、
+unsupported-vmess 等；无法识别内容只标记 unknown-text 或 unknown-scheme，不输出实际文本或 scheme。
+解析错误附带 class=，无需为了诊断打印原行。
+下载过程另外区分 proxy-dial、tls-start/ok/failed 和 response-first-byte；
+EOF、流截断、网络不可达增加安全错误分类。由此可继续排查没有 HTTP 响应的订阅。
+HTTP Content-Type 仅作为诊断信息：某些服务会用 text/html 返回有效 Base64 订阅，
+程序按正文格式解析，不单凭该响应头认定是网页。
+
+N1 日志已证明 7373 能为其中两个订阅返回完整 Base64 正文；
+其“其他行”的具体内容仍未知，本次只兼容以上明确类别，不能据此宣称真实订阅已修复。

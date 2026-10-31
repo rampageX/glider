@@ -83,7 +83,7 @@ func (m *Manager) Refresh(ctx context.Context) {
 		}
 		nodes, hit, skipped, e := m.input(ctx, raw)
 		if skipped > 0 {
-			log.F("[subscription] input %d skipped %d unsupported nodes (plugin/cipher/protocol/obfs)", i+1, skipped)
+			log.F("[subscription] input %d skipped %d unsupported nodes (scheme/plugin/cipher/protocol/obfs)", i+1, skipped)
 		}
 		if e != nil {
 			log.F("[subscription] input %d failed; ignored", i+1)
@@ -176,11 +176,11 @@ func (m *Manager) input(ctx context.Context, raw string) ([]Node, bool, int, err
 		if ctx.Err() != nil {
 			return nil, false, 0, ctx.Err()
 		}
-		debugf(m.conf,"input=%s route=%d via=%s stage=get-start",cacheKey(raw)[:8],index+1,routeLabel(r.definition))
- b, e := download(ctx, raw, r, m.conf)
+		debugf(m.conf, "input=%s route=%d via=%s stage=get-start", cacheKey(raw)[:8], index+1, routeLabel(r.definition))
+		b, e := download(ctx, raw, r, m.conf)
 		if e != nil {
 			log.F("[subscription] input %s route %d GET failed", cacheKey(raw)[:8], index+1)
- debugf(m.conf,"input=%s route=%d %s",cacheKey(raw)[:8],index+1,e.Error())
+			debugf(m.conf, "input=%s route=%d %s", cacheKey(raw)[:8], index+1, e.Error())
 			continue
 		}
 		n, s, e := Parse(b)
@@ -189,7 +189,7 @@ func (m *Manager) input(ctx context.Context, raw string) ([]Node, bool, int, err
 		}
 		if e != nil {
 			log.F("[subscription] input %s route %d invalid/unsupported input; ignored in full", cacheKey(raw)[:8], index+1)
- debugf(m.conf,"input=%s route=%d stage=parse-result reason=%s",cacheKey(raw)[:8],index+1,e.Error())
+			debugf(m.conf, "input=%s route=%d stage=parse-result reason=%s", cacheKey(raw)[:8], index+1, e.Error())
 			continue
 		}
 		defs := make([]string, len(n))
@@ -197,7 +197,7 @@ func (m *Manager) input(ctx context.Context, raw string) ([]Node, bool, int, err
 			defs[i] = n[i].Forward
 		}
 		if Validate(defs) != nil {
- debugf(m.conf,"input=%s route=%d stage=forwarder-validation reason=invalid-forwarder",cacheKey(raw)[:8],index+1)
+			debugf(m.conf, "input=%s route=%d stage=forwarder-validation reason=invalid-forwarder", cacheKey(raw)[:8], index+1)
 			continue
 		}
 		entry := cacheEntry{At: time.Now(), Body: b}

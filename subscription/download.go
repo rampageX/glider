@@ -2,11 +2,13 @@ package subscription
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
- "fmt"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"sort"
 	"strings"
@@ -114,7 +116,16 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 			return nil, errors.New("invalid download route")
 		}
 	}
-	tr := &http.Transport{Proxy: nil, DisableKeepAlives: true, TLSHandshakeTimeout: c.duration(c.ConnectTimeout), ResponseHeaderTimeout: c.duration(c.Timeout), DialContext: func(_ context.Context, network, addr string) (net.Conn, error) { return d.Dial(network, addr) }}
+	tr := &http.Transport{Proxy: nil, DisableKeepAlives: true, TLSHandshakeTimeout: c.duration(c.ConnectTimeout), ResponseHeaderTimeout: c.duration(c.Timeout), DialContext: func(_ context.Context, network, addr string) (net.Conn, error) {
+		debugf(c, "input=%s route=%s stage=proxy-dial-start", cacheKey(raw)[:8], routeLabel(r.definition))
+		conn, err := d.Dial(network, addr)
+		if err != nil {
+			debugf(c, "input=%s route=%s stage=proxy-dial-failed reason=%s", cacheKey(raw)[:8], routeLabel(r.definition), networkReason(err))
+		} else {
+			debugf(c, "input=%s route=%s stage=proxy-dial-ok", cacheKey(raw)[:8], routeLabel(r.definition))
+		}
+		return conn, err
+	}}
 	defer tr.CloseIdleConnections()
 	client := &http.Client{Transport: tr, Timeout: c.duration(c.Timeout), CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
@@ -129,23 +140,37 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	if e != nil {
 		return nil, errors.New("invalid request")
 	}
+	trace := &httptrace.ClientTrace{
+		TLSHandshakeStart: func() { debugf(c, "input=%s route=%s stage=tls-start", cacheKey(raw)[:8], routeLabel(r.definition)) },
+		TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
+			if err != nil {
+				debugf(c, "input=%s route=%s stage=tls-failed reason=%s", cacheKey(raw)[:8], routeLabel(r.definition), networkReason(err))
+			} else {
+				debugf(c, "input=%s route=%s stage=tls-ok", cacheKey(raw)[:8], routeLabel(r.definition))
+			}
+		},
+		GotFirstResponseByte: func() {
+			debugf(c, "input=%s route=%s stage=response-first-byte", cacheKey(raw)[:8], routeLabel(r.definition))
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	req.Header.Set("User-Agent", "Glider-subscription/1")
 	resp, e := client.Do(req)
 	if e != nil {
-		return nil, fmt.Errorf("stage=get reason=%s",networkReason(e))
+		return nil, fmt.Errorf("stage=get reason=%s", networkReason(e))
 	}
 	defer resp.Body.Close()
- debugf(c,"input=%s route=%s stage=response status=%d media=%s declared-bytes=%d",cacheKey(raw)[:8],routeLabel(r.definition),resp.StatusCode,mediaKind(resp.Header.Get("Content-Type")),resp.ContentLength)
+	debugf(c, "input=%s route=%s stage=response status=%d media=%s declared-bytes=%d", cacheKey(raw)[:8], routeLabel(r.definition), resp.StatusCode, mediaKind(resp.Header.Get("Content-Type")), resp.ContentLength)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("stage=response status=%d",resp.StatusCode)
+		return nil, fmt.Errorf("stage=response status=%d", resp.StatusCode)
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, int64(c.MaxBytes)+1))
 	if e != nil {
-		return nil, fmt.Errorf("stage=read reason=%s",networkReason(e))
+		return nil, fmt.Errorf("stage=read reason=%s", networkReason(e))
 	}
 	if len(b) > c.MaxBytes {
 		return nil, errors.New("response limit exceeded")
 	}
-	debugf(c,"input=%s route=%s stage=body %s",cacheKey(raw)[:8],routeLabel(r.definition),bodySummary(b))
- return b, nil
+	debugf(c, "input=%s route=%s stage=body %s", cacheKey(raw)[:8], routeLabel(r.definition), bodySummary(b))
+	return b, nil
 }

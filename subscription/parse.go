@@ -31,19 +31,24 @@ func decode(s string) (string, error) {
 // Parse rejects an entire malformed input. Recognized but unsupported nodes are
 // skipped explicitly, not silently converted to a different transport.
 func Parse(body []byte) (nodes []Node, skipped int, err error) {
-	s := strings.TrimSpace(strings.TrimPrefix(string(body), "\ufeff"))
-	if !strings.HasPrefix(s, "ss://") && !strings.HasPrefix(s, "ssr://") {
+	s := cleanLine(string(body))
+	if !looksPlain(s) {
 		s, err = decode(s)
 		if err != nil {
-			return nil, 0, fmt.Errorf("stage=envelope reason=%s body=%s",parseReason(err),bodyKind(body))
+			return nil, 0, fmt.Errorf("stage=envelope reason=%s body=%s", parseReason(err), bodyKind(body))
 		}
 	}
 	if !utf8.ValidString(s) {
 		return nil, 0, errors.New("invalid UTF-8")
 	}
 	for i, line := range strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
+		line = cleanLine(line)
+		class := lineClass(line)
+		if ignoredLine(class) {
+			continue
+		}
+		if strings.HasPrefix(class, "unsupported-") {
+			skipped++
 			continue
 		}
 		var n Node
@@ -60,7 +65,7 @@ func Parse(body []byte) (nodes []Node, skipped int, err error) {
 			continue
 		}
 		if err != nil {
-			return nil, skipped, fmt.Errorf("stage=node line=%d protocol=%s reason=%s",i+1,nodeProtocol(line),parseReason(err))
+			return nil, skipped, fmt.Errorf("stage=node line=%d protocol=%s class=%s reason=%s", i+1, nodeProtocol(line), class, parseReason(err))
 		}
 		nodes = append(nodes, n)
 	}
@@ -101,7 +106,7 @@ func parseSS(s string) (Node, error) {
 		var e error
 		name, e = url.PathUnescape(b)
 		if e != nil {
-			return Node{}, atStage("ss-name-percent",e)
+			return Node{}, atStage("ss-name-percent", e)
 		}
 	}
 	// Query belongs to SIP002, never to a base64 payload.
@@ -112,7 +117,7 @@ func parseSS(s string) (Node, error) {
 	}
 	q, e := url.ParseQuery(query)
 	if e != nil {
-		return Node{}, atStage("ss-query",e)
+		return Node{}, atStage("ss-query", e)
 	}
 	if len(q) > 0 {
 		return Node{}, errUnsupported
@@ -123,7 +128,7 @@ func parseSS(s string) (Node, error) {
 	if at < 0 {
 		decoded, e := decode(raw)
 		if e != nil {
-			return Node{}, atStage("ss-whole-base64",e)
+			return Node{}, atStage("ss-whole-base64", e)
 		}
 		at = strings.LastIndexByte(decoded, '@')
 		if at < 0 {
@@ -139,7 +144,7 @@ func parseSS(s string) (Node, error) {
 			user, e = url.PathUnescape(user)
 		}
 		if e != nil {
-			return Node{}, atStage("ss-userinfo",e)
+			return Node{}, atStage("ss-userinfo", e)
 		}
 	}
 	method, pass, ok := strings.Cut(user, ":")
@@ -154,7 +159,7 @@ func parseSS(s string) (Node, error) {
 func parseSSR(s string) (Node, error) {
 	decoded, e := decode(strings.TrimPrefix(s, "ssr://"))
 	if e != nil {
-		return Node{}, atStage("ssr-envelope-base64",e)
+		return Node{}, atStage("ssr-envelope-base64", e)
 	}
 	core, query, _ := strings.Cut(decoded, "/?")
 	// Split from the right to preserve IPv6 host colons.
@@ -170,23 +175,23 @@ func parseSSR(s string) (Node, error) {
 	parts[0] = core
 	port, e := strconv.Atoi(parts[1])
 	if e != nil {
-		return Node{}, atStage("ssr-port",e)
+		return Node{}, atStage("ssr-port", e)
 	}
 	pass, e := decode(parts[5])
 	if e != nil {
-		return Node{}, atStage("ssr-password-base64",e)
+		return Node{}, atStage("ssr-password-base64", e)
 	}
 	// SSR base64 parameters use '+' literally, unlike form-encoded queries.
 	q, e := url.ParseQuery(strings.ReplaceAll(query, "+", "%2B"))
 	if e != nil {
-		return Node{}, atStage("ssr-query",e)
+		return Node{}, atStage("ssr-query", e)
 	}
 	vals := map[string]string{}
 	for _, key := range []string{"remarks", "group", "protoparam", "obfsparam"} {
 		if v := q.Get(key); v != "" {
 			vals[key], e = decode(v)
 			if e != nil {
-				return Node{}, atStage("ssr-"+key+"-base64",e)
+				return Node{}, atStage("ssr-"+key+"-base64", e)
 			}
 		}
 	}
