@@ -5,7 +5,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
-	"strings"
+	"sync"
 
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/socks"
@@ -24,6 +24,7 @@ func init() {
 
 // SSR struct.
 type SSR struct {
+	mu     sync.Mutex
 	dialer proxy.Dialer
 	addr   string
 
@@ -62,6 +63,15 @@ func NewSSR(s string, d proxy.Dialer) (*SSR, error) {
 	p.Obfs = query.Get("obfs")
 	p.ObfsParam = query.Get("obfs_param")
 
+	if err := cipher.CheckCipherMethod(method); err != nil {
+		return nil, errors.New("unsupported SSR cipher")
+	}
+	if pass == "" {
+		return nil, errors.New("empty SSR password")
+	}
+	if obfs.NewObfs(p.Obfs) == nil || protocol.NewProtocol(p.Protocol) == nil {
+		return nil, errors.New("unsupported SSR protocol or obfs")
+	}
 	p.ProtocolData = new(protocol.AuthData)
 
 	return p, nil
@@ -104,8 +114,12 @@ func (s *SSR) Dial(network, addr string) (net.Conn, error) {
 	}
 
 	// should initialize obfs/protocol now
-	rs := strings.Split(ssrconn.RemoteAddr().String(), ":")
-	port, _ := strconv.Atoi(rs[1])
+	remoteHost, remotePort, err := net.SplitHostPort(ssrconn.RemoteAddr().String())
+	if err != nil {
+		ssrconn.Close()
+		return nil, err
+	}
+	port, _ := strconv.Atoi(remotePort)
 
 	ssrconn.IObfs = obfs.NewObfs(s.Obfs)
 	if ssrconn.IObfs == nil {
@@ -113,7 +127,7 @@ func (s *SSR) Dial(network, addr string) (net.Conn, error) {
 	}
 
 	obfsServerInfo := &ssrinfo.ServerInfo{
-		Host:   rs[0],
+		Host:   remoteHost,
 		Port:   uint16(port),
 		TcpMss: 1460,
 		Param:  s.ObfsParam,
@@ -126,13 +140,14 @@ func (s *SSR) Dial(network, addr string) (net.Conn, error) {
 	}
 
 	protocolServerInfo := &ssrinfo.ServerInfo{
-		Host:   rs[0],
+		Host:   remoteHost,
 		Port:   uint16(port),
 		TcpMss: 1460,
 		Param:  s.ProtocolParam,
 	}
 	ssrconn.IProtocol.SetServerInfo(protocolServerInfo)
 
+	s.mu.Lock()
 	if s.ObfsData == nil {
 		s.ObfsData = ssrconn.IObfs.GetData()
 	}
@@ -142,6 +157,7 @@ func (s *SSR) Dial(network, addr string) (net.Conn, error) {
 		s.ProtocolData = ssrconn.IProtocol.GetData()
 	}
 	ssrconn.IProtocol.SetData(s.ProtocolData)
+	s.mu.Unlock()
 
 	if _, err := ssrconn.Write(target); err != nil {
 		ssrconn.Close()

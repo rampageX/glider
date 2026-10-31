@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -86,6 +87,9 @@ func (c *httpChecker) Check(fwdr *Forwarder) (time.Duration, error) {
 		return 0, err
 	}
 
+	if c.timeout > 0 {
+		rc.SetDeadline(time.Now().Add(c.timeout))
+	}
 	if c.tlsConfig != nil {
 		tlsConn := tls.Client(rc, c.tlsConfig)
 		if err := tlsConn.Handshake(); err != nil {
@@ -131,7 +135,10 @@ func newFileChecker(path string) *fileChecker { return &fileChecker{path} }
 
 // Check implements the Checker interface.
 func (c *fileChecker) Check(fwdr *Forwarder) (time.Duration, error) {
-	cmd := exec.Command(c.path)
+	return c.CheckContext(context.Background(), fwdr)
+}
+func (c *fileChecker) CheckContext(ctx context.Context, fwdr *Forwarder) (time.Duration, error) {
+	cmd := exec.CommandContext(ctx, c.path)
 	cmd.Stdout = os.Stdout
 	cmd.Env = os.Environ()
 	cmd.Env = append(cmd.Env, "FORWARDER_ADDR="+fwdr.Addr())

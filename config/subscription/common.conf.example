@@ -1,0 +1,18 @@
+# Copy to /root/cfg/subscription-common.conf and chmod 600.
+# Replace placeholders locally; never publish real URLs/tokens.
+subscription=https://subscription.example.invalid/REPLACE_TOKEN_1
+subscription=https://subscription.example.invalid/REPLACE_TOKEN_2
+subscription-cache-dir=/root/cfg/subscription-cache
+subscription-cache-ttl=3600
+subscription-interval=3600
+subscription-connect-timeout=3
+subscription-timeout=15
+subscription-max-bytes=8388608
+subscription-exclude=遊戲
+# Larger priority FIRST, declaration order for ties. No implicit direct attempt.
+subscription-proxy=direct://#priority=100
+subscription-proxy=socks5h://192.168.2.8:7373#priority=90
+subscription-proxy=socks5h://127.0.0.1:7575#priority=80
+subscription-proxy=socks5h://127.0.0.1:7776#priority=70
+subscription-proxy=socks5h://127.0.0.1:7777#priority=60
+subscription-proxy=socks5h://127.0.0.1:7778#priority=50

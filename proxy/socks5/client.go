@@ -15,6 +15,7 @@ import (
 
 func init() {
 	proxy.RegisterDialer("socks5", NewSocks5Dialer)
+	proxy.RegisterDialer("socks5h", NewSocks5Dialer)
 }
 
 // NewSocks5Dialer returns a socks5 proxy dialer.

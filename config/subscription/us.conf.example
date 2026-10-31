@@ -1,0 +1,17 @@
+# Copy to /root/cfg/glider_us.conf and chmod 600.
+include=subscription-common.conf
+verbose=False
+listen=:7778
+web=:8888
+strategy=lha
+check=http://clients3.google.com/generate_204#expect=204
+checkinterval=60
+checklatencysamples=3
+checktimeout=3
+checktolerance=1000
+subscription-region=us
+subscription-output=/root/cfg/glider_db_us_ssr.conf
+subscription-match=美国
+subscription-match=美國
+rules-dir=/root/cfg/rules.d
+# DO NOT include the subscription-output file.

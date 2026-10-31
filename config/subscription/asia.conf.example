@@ -1,0 +1,20 @@
+# Copy to /root/cfg/glider.conf and chmod 600.
+include=subscription-common.conf
+verbose=False
+listen=:7575
+web=:8885
+strategy=lha
+check=http://clients3.google.com/generate_204#expect=204
+checkinterval=60
+checklatencysamples=3
+checktimeout=3
+checktolerance=1000
+subscription-region=asia
+subscription-output=/root/cfg/glider_db_asia_ssr.conf
+subscription-match=香港
+subscription-match=台灣
+subscription-match=日本
+subscription-match=新加坡
+subscription-match=韩国
+rules-dir=/root/cfg/rules.d
+# DO NOT include the subscription-output file.

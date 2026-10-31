@@ -152,3 +152,8 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 This project retains the license of the upstream glider project. See [LICENSE](LICENSE).
+
+### Native SS/SSR subscription (development)
+
+See [N1 configuration, migration, tests and rollback](docs/native-subscriptions.md).
+Example configurations are in [config/subscription](config/subscription).

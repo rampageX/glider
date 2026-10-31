@@ -1,0 +1,38 @@
+name: Native subscription test (N1)
+on:
+  push:
+    branches: ["native-subscriptions-20261031"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Unit, integration, subprocess and race tests
+        run: go test -race -count=1 ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Build N1 Linux ARM64 and check Windows compatibility
+        run: |
+          mkdir -p package
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=0.21.0-subscription-$(git rev-parse --short HEAD)" -o package/glider .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/glider.exe .
+          cp -r config/subscription package/config
+          cp docs/native-subscriptions.md package/README.md
+          cp LICENSE package/
+          git rev-parse HEAD > package/SOURCE_COMMIT
+          cd package
+          sha256sum glider > SHA256SUMS
+          tar -czf ../glider-native-subscription-linux-arm64.tar.gz .
+      - uses: actions/upload-artifact@v6
+        with:
+          name: glider-native-subscription-linux-arm64-${{ github.sha }}
+          path: glider-native-subscription-linux-arm64.tar.gz
+          retention-days: 30
+          if-no-files-found: error

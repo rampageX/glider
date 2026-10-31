@@ -19,15 +19,29 @@ import (
 	"github.com/nadoo/glider/rule"
 	"github.com/nadoo/glider/service"
 	"github.com/nadoo/glider/stats"
+	"github.com/nadoo/glider/subscription"
 	"github.com/nadoo/glider/web"
 )
 
 var (
 	version = "0.21.0"
-	config  = parseConfig()
+	config  *Config
 )
 
 func main() {
+	config = parseConfig()
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+	static := append([]string(nil), config.Forwards...)
+	if len(config.Subscription.URLs) > 0 {
+		if defs, err := subscription.ReadSnapshot(config.Subscription.Output); err == nil && subscription.Validate(defs) == nil {
+			config.Forwards = append(config.Forwards, defs...)
+			log.F("[subscription] restored last successful node snapshot; freshness unknown")
+		} else if len(config.Forwards) == 0 {
+			config.Forwards = []string{"reject://#name=subscription-pending"}
+			log.F("[subscription] no valid snapshot; waiting for subscription (fail closed)")
+		}
+	}
 	if err := stats.InitAvailabilityStore(flag.ConfDir(), lhaHistoryInstanceID(config)); err != nil {
 		log.F("[lha-history] historical availability will not be persisted: %s", err)
 	} else {
@@ -35,6 +49,18 @@ func main() {
 	}
 
 	pxy := rule.NewProxy(config.Forwards, &config.Strategy, config.rules)
+	defer pxy.Close()
+	var manager *subscription.Manager
+	if len(config.Subscription.URLs) > 0 {
+		pxy.EnableDynamicMain()
+		var err error
+		manager, err = subscription.New(config.Subscription, func(defs []string, persist func() error) (bool, error) {
+			return pxy.ReplaceMain(append(append([]string(nil), static...), defs...), persist)
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 	ipsetM, _ := ipset.NewManager(config.rules)
 
 	if config.DNS != "" {
@@ -88,9 +114,18 @@ func main() {
 		go service.Run()
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+	if manager != nil {
+		refresh := make(chan os.Signal, 1)
+		signal.Notify(refresh, syscall.SIGHUP)
+		defer signal.Stop(refresh)
+		done := make(chan struct{})
+		go func() { defer close(done); manager.Run(ctx, refresh) }()
+		<-ctx.Done()
+		<-done
+	} else {
+		<-ctx.Done()
+	}
+
 }
 
 // lhaHistoryInstanceID keeps histories from differently configured Glider

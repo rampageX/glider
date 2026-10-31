@@ -8,9 +8,11 @@ import (
 	"github.com/nadoo/conflag"
 
 	"github.com/nadoo/glider/dns"
+	"github.com/nadoo/glider/pkg/configfile"
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/proxy"
 	"github.com/nadoo/glider/rule"
+	"github.com/nadoo/glider/subscription"
 )
 
 var flag = conflag.New()
@@ -36,7 +38,8 @@ type Config struct {
 
 	rules []*rule.Config
 
-	Services []string
+	Subscription subscription.Config
+	Services     []string
 }
 
 func parseConfig() *Config {
@@ -93,8 +96,9 @@ check=disable: disable health check`)
 	// service configs
 	flag.StringSliceUniqVar(&conf.Services, "service", nil, "run specified services, format: SERVICE_NAME[,SERVICE_CONFIG]")
 
+	subscription.RegisterFlags(flag, &conf.Subscription)
 	flag.Usage = usage
-	if err := flag.Parse(); err != nil {
+	if err := configfile.Parse(flag, os.Args[1:], os.Args[0]); err != nil {
 		// flag.Usage()
 		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(-1)
@@ -129,6 +133,9 @@ check=disable: disable health check`)
 		proxy.UDPBufSize = conf.UDPBufSize
 	}
 
+	if err := conf.Subscription.Resolve(flag.ConfDir()); err != nil {
+		log.Fatal(err)
+	}
 	loadRules(conf)
 	return conf
 }

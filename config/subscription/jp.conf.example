@@ -1,0 +1,16 @@
+# Copy to /root/cfg/glider_jp.conf and chmod 600.
+include=subscription-common.conf
+verbose=False
+listen=:7777
+web=:8887
+strategy=lha
+check=http://clients3.google.com/generate_204#expect=204
+checkinterval=60
+checklatencysamples=3
+checktimeout=3
+checktolerance=1000
+subscription-region=jp
+subscription-output=/root/cfg/glider_db_jp_ssr.conf
+subscription-match=日本
+rules-dir=/root/cfg/rules.d
+# DO NOT include the subscription-output file.

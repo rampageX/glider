@@ -53,16 +53,21 @@ func NewDirectDialer(s string, d Dialer) (Dialer, error) {
 func (d *Direct) Addr() string { return "DIRECT" }
 
 // Dial connects to the address addr on the network net
-func (d *Direct) Dial(network, addr string) (c net.Conn, err error) {
+func (d *Direct) Dial(network, addr string) (net.Conn, error) {
+	return d.DialContext(context.Background(), network, addr)
+}
+
+// DialContext permits bounded callers to cancel DNS and TCP connection setup.
+func (d *Direct) DialContext(ctx context.Context, network, addr string) (c net.Conn, err error) {
 	if d.iface == nil || d.ip != nil {
-		c, err = d.dial(network, addr, d.ip)
+		c, err = d.dial(ctx, network, addr, d.ip)
 		if err == nil {
 			return
 		}
 	}
 
 	for _, ip := range d.IFaceIPs() {
-		c, err = d.dial(network, addr, ip)
+		c, err = d.dial(ctx, network, addr, ip)
 		if err == nil {
 			d.ip = ip
 			break
@@ -77,7 +82,7 @@ func (d *Direct) Dial(network, addr string) (c net.Conn, err error) {
 	return c, err
 }
 
-func (d *Direct) dial(network, addr string, localIP net.IP) (net.Conn, error) {
+func (d *Direct) dial(ctx context.Context, network, addr string, localIP net.IP) (net.Conn, error) {
 	var la net.Addr
 	switch network {
 	case "tcp":
@@ -91,7 +96,7 @@ func (d *Direct) dial(network, addr string, localIP net.IP) (net.Conn, error) {
 		dialer.Control = sockopt.Control(sockopt.Bind(d.iface))
 	}
 
-	c, err := dialer.Dial(network, addr)
+	c, err := dialer.DialContext(ctx, network, addr)
 	if err != nil {
 		return nil, err
 	}

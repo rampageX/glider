@@ -1,0 +1,16 @@
+# Copy to /root/cfg/glider_hk.conf and chmod 600.
+include=subscription-common.conf
+verbose=False
+listen=:7776
+web=:8886
+strategy=lha
+check=http://clients3.google.com/generate_204#expect=204
+checkinterval=60
+checklatencysamples=3
+checktimeout=3
+checktolerance=1000
+subscription-region=hk
+subscription-output=/root/cfg/glider_db_hk_ssr.conf
+subscription-match=香港
+rules-dir=/root/cfg/rules.d
+# DO NOT include the subscription-output file.

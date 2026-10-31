@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/proxy"
@@ -12,11 +13,13 @@ import (
 
 // Proxy implements the proxy.Proxy interface with rule support.
 type Proxy struct {
-	main      *FwdrGroup
-	all       []*FwdrGroup
-	domainMap sync.Map
-	ipMap     sync.Map
-	cidrMap   sync.Map
+	main          *FwdrGroup
+	direct        *FwdrGroup
+	forwardRoutes atomic.Pointer[forwardRoutes]
+	all           []*FwdrGroup
+	domainMap     sync.Map
+	ipMap         sync.Map
+	cidrMap       sync.Map
 }
 
 // NewProxy returns a new rule proxy.
@@ -53,16 +56,8 @@ func NewProxy(mainForwarders []string, mainStrategy *Strategy, rules []*Config) 
 	direct := NewFwdrGroup("", nil, mainStrategy)
 	rd.domainMap.Store("direct", direct)
 
-	// if there's any forwarder defined in main config, make sure they will be accessed directly.
-	if len(mainForwarders) > 0 {
-		for _, f := range rd.main.fwdrs {
-			addr := strings.Split(f.addr, ",")[0]
-			host, _, _ := net.SplitHostPort(addr)
-			if _, err := netip.ParseAddr(host); err != nil {
-				rd.domainMap.Store(strings.ToLower(host), direct)
-			}
-		}
-	}
+	rd.direct = direct
+	rd.updateForwardRoutes()
 
 	return rd
 }
@@ -86,6 +81,11 @@ func (p *Proxy) findDialer(dstAddr string) *FwdrGroup {
 
 	if ip, err := netip.ParseAddr(host); err == nil {
 		// check ip
+		if routes := p.forwardRoutes.Load(); routes != nil {
+			if _, ok := routes.ips.Load(ip); ok {
+				return p.direct
+			}
+		}
 		if proxy, ok := p.ipMap.Load(ip); ok {
 			return proxy.(*FwdrGroup)
 		}
@@ -107,6 +107,11 @@ func (p *Proxy) findDialer(dstAddr string) *FwdrGroup {
 
 	// check host
 	host = strings.ToLower(host)
+	if routes := p.forwardRoutes.Load(); routes != nil {
+		if routes.matches(host) {
+			return p.direct
+		}
+	}
 	for i := len(host); i != -1; {
 		i = strings.LastIndexByte(host[:i], '.')
 		if proxy, ok := p.domainMap.Load(host[i+1:]); ok {
@@ -136,6 +141,9 @@ func (p *Proxy) Record(dialer proxy.Dialer, success bool) {
 // AddDomainIP used to update ipMap rules according to domainMap rule.
 func (p *Proxy) AddDomainIP(domain string, ip netip.Addr) error {
 	domain = strings.ToLower(domain)
+	if routes := p.forwardRoutes.Load(); routes != nil && routes.matches(domain) {
+		routes.ips.Store(ip, true)
+	}
 	for i := len(domain); i != -1; {
 		i = strings.LastIndexByte(domain[:i], '.')
 		if dialer, ok := p.domainMap.Load(domain[i+1:]); ok {

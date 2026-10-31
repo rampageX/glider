@@ -41,3 +41,9 @@ glider
 
 # Local Windows test builds
 /build/
+
+# Native subscription regression coverage must ship with the feature.
+!/config_subscription_test.go
+!/pkg/configfile/*_test.go
+!/subscription/*_test.go
+!/rule/update_test.go
