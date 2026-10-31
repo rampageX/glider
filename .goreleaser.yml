@@ -16,7 +16,7 @@ builds:
       - v1
       - v4
     ldflags:
-      - -s -w
+      - -s -w -X main.version={{.Version}}
 
   - id: linux
     env:
@@ -43,7 +43,7 @@ builds:
     goriscv64:
       - rva20u64
     ldflags:
-      - -s -w
+      - -s -w -X main.version={{.Version}}
 
 archives:
   - id: default
@@ -58,6 +58,9 @@ archives:
     files:
       - LICENSE
       - README.md
+      - CHANGELOG.md
+      - docs/native-subscriptions.md
+      - docs/releases/*.md
       - config/**/*
       - systemd/*
 

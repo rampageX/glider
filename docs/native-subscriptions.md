@@ -1,4 +1,4 @@
-# 原生 SS/SSR 订阅：N1 测试版
+# 原生 SS/SSR 订阅（v0.22.0）
 
 此功能只更新默认 main 节点组。四个进程仍独立监听、筛选、生成文件和应用节点；
 共享的是原始订阅缓存，不共享运行中节点。没有通用配置热重载，不调用外部下载工具、脚本或 systemctl。
@@ -128,8 +128,8 @@ LHA 当前选择、Web 状态和节点域名直连路由同步更新；历史记
 
 ## N1 迁移（先只试 asia）
 
-1. 下载开发分支 Actions 的 ARM64 artifact，解压外层 ZIP 和内部 tar.gz。
-   `SOURCE_COMMIT` 标出源码，`sha256sum -c SHA256SUMS` 核对 glider。
+1. 下载正式 Release 中的 Linux ARM64 tar.gz，或需要排查时下载开发分支 Actions artifact。
+   正式包使用 Release 附带的 checksums.txt 核对压缩包；Actions 测试包则用 SOURCE_COMMIT 和 SHA256SUMS 核对。
    先备份原二进制、四份主配置、四份节点文件、旧脚本和 crontab，不删除它们。
 2. 检查现有 systemd 的 ExecStart 和配置文件路径，按真实路径安装新二进制。
    文件替换用临时文件加 mv，保留可执行权限。升级二进制及改主配置后首次切换需要管理员重启服务；
@@ -171,7 +171,7 @@ LHA 当前选择、Web 状态和节点域名直连路由同步更新；历史记
 检查任务退出及并发选择/Web 快照。Actions 运行全套 race tests、vet 和 Linux ARM64/Windows 交叉编译。
 
 源码及本地/CI 测试不能代替 N1 验证：真实订阅服务、PC/本机实际六条路径、SS/SSR 服务端互通、
-ARM64 运行表现、systemd 配置以及实网长连接连续性均由 N1 实机确认。此分支不发布正式 Release。
+ARM64 运行表现、systemd 配置以及实网长连接连续性均由 N1 实机确认。v0.22.0 已在 N1 完成用户实测后发布；其他架构的交叉编译不等同于实机验证。
 
 ## 诊断版：跟随 -verbose
 

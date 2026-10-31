@@ -21,7 +21,7 @@ jobs:
       - name: Build N1 Linux ARM64 and check Windows compatibility
         run: |
           mkdir -p package
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=0.21.0-subscription-$(git rev-parse --short HEAD)" -o package/glider .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=0.22.0-subscription-$(git rev-parse --short HEAD)" -o package/glider .
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/glider.exe .
           cp -r config/subscription package/config
           cp docs/native-subscriptions.md package/README.md

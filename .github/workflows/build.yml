@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - "dev"
+      - "release/v*"
     tags:
       - "*"
   pull_request:
@@ -40,15 +41,43 @@ jobs:
       - name: Test
         run: go test -v ./...
 
+      # Release branches must point at main. The repository-scoped Actions token
+      # creates the tag, and this same job publishes (token pushes do not trigger
+      # another workflow). Tag pushes remain supported for normal CLI releases.
+      - name: Prepare release tag
+        if: startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/release/v')
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/heads/release/* ]]; then
+            tag="${GITHUB_REF#refs/heads/release/}"
+            test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+          else
+            tag="${GITHUB_REF#refs/tags/}"
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          grep -Fq "version = \"${tag#v}\"" main.go
+          test -f "docs/releases/$tag.md"
+          if [[ "$GITHUB_REF" == refs/heads/release/* ]]; then
+            if git show-ref --verify --quiet "refs/tags/$tag"; then
+              test "$(git rev-parse "$tag^{commit}")" = "$(git rev-parse HEAD)"
+            else
+              git tag "$tag"
+              git push origin "refs/tags/$tag"
+            fi
+          fi
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+
       - name: Build
         uses: goreleaser/goreleaser-action@v7
-        if: "!startsWith(github.ref, 'refs/tags/')"
+        if: "!startsWith(github.ref, 'refs/tags/') && !startsWith(github.ref, 'refs/heads/release/v')"
         with:
           args: build --snapshot --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Artifacts
+        if: "!startsWith(github.ref, 'refs/tags/') && !startsWith(github.ref, 'refs/heads/release/v')"
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APP_NAME }}-dev-${{ env.SHA_SHORT }}
@@ -58,17 +87,17 @@ jobs:
 
       - name: Release
         uses: goreleaser/goreleaser-action@v7
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/release/v')
         with:
-          args: release --clean
+          args: release --clean --release-notes docs/releases/${{ env.RELEASE_TAG }}.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Binaries To Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/release/v')
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             ./dist/linux_linux_amd64_v4/${{ env.APP_NAME }}
             ./dist/windows_windows_amd64_v4/${{ env.APP_NAME }}.exe

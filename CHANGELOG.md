@@ -2,6 +2,32 @@
 
 All notable changes in this fork are documented here.
 
+## [0.22.0] - 2026-11-01
+
+### Added
+
+- Native SS/SSR subscriptions: multiple inputs, literal region filters, ordered direct/proxy fallback GET requests, and credential-safe verbose diagnostics.
+- Shared, locked, atomic raw subscription caching and managed regional forward files that also serve as last-successful node snapshots.
+- Transactional runtime main-group updates, preserving unchanged forwarder objects and existing connections; removed health-check tasks can exit.
+- Mixed-subscription metadata/comment handling; known unsupported sharing schemes are counted and skipped without conversion.
+- Optional subscription titles and a Status panel showing masked URLs, independent refresh outcomes, cache/download source, check/download timestamps and next refresh time.
+- Configurable failure retries, defaulting to 7200 seconds (two hours), without earlier interruption by the normal refresh interval.
+- Configurable `lha-history-dir`; cache and history defaults now use temporary directories instead of the main configuration directory.
+- Complete shared/four-instance example configurations and migration/rollback instructions.
+
+### Changed
+
+- Main configuration includes expand in place and parse once: ordered list append, last scalar wins, CLI last, relative include paths based on the including file. Ordinary missing includes remain errors.
+- SS unsupported ciphers return errors instead of terminating the process. Added the `socks5h` alias for the existing remote-DNS SOCKS5 dialer.
+- Subscription-generated files use `subscription-output`, never a duplicate static include. Identical definitions do not rewrite files or reset health state.
+- Releases include subscription documentation/examples and inject the package version into the executable.
+
+### Validation
+
+- Automated race, parser, proxy, subprocess cache-lock, cancellation, runtime replacement, TCP continuity, status and retry tests use local fixtures only.
+- N1 ARM64 user testing confirmed startup without an old node file and the latest subscription/status build. Individual failing subscription services are not claimed universally reachable.
+- Other release architectures are cross-compiled; they have not all been tested on physical hardware.
+
 ## [0.21.0] - 2026-09-27
 
 ### Added
