@@ -4,12 +4,66 @@ A compact multi-protocol forward proxy with flexible proxy chains, rule-based ro
 
 This repository is a maintained fork derived from [nadoo/glider](https://github.com/nadoo/glider) and [0xec/glider](https://github.com/0xec/glider). It keeps glider's lightweight design while adding practical observability for latency-based high availability (LHA) operation.
 
-## v0.21.0 highlights
+## v0.22.0 highlights
 
-- Daily LHA availability statistics for groups and their forwarders.
-- Per-forwarder daily availability and 15-minute availability/latency timelines, with jitter and the most/least stable windows shown in the summaries.
-- New WebUI history page at `/lha` and query API at `/api/lha/history?date=YYYY-MM-DD`.
-- Persistent daily JSONL history, separated automatically by Glider instance, with configurable retention (30 local dates by default).
+**Native SS/SSR subscriptions, live node updates, and subscription status in the WebUI.**
+
+- **Built-in subscription management:** download and parse multiple SS/SSR subscriptions, preserve node names, and filter regions using configurable literal keywords. No external update script is required.
+- **Update nodes while running:** generate standard `forward=` files and apply changes without restarting Glider. Identical definitions keep their health state; all-input failures or empty candidates retain the current nodes. Partial failures exclude the failed input.
+- **Independent download fallback per subscription:** ordered direct/proxy GET attempts, a shared cross-process cache, and atomic cache/output writes.
+- **Visible subscription health:** optional titles, masked URLs, individual success/failure results, check/download timestamps, and the next refresh time on Status.
+- **Conservative failure retries:** a separate retry interval defaults to **7200 seconds (two hours)**; a shorter normal refresh interval does not bring a failed retry forward.
+- **Configurable storage and diagnostics:** Linux cache defaults to `/tmp/.subscription-cache`, LHA history to `/tmp/.glider-history`; `-verbose` adds diagnostics without printing subscription URLs, tokens, or response bodies.
+
+[Download v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.22.0.md)
+
+## Native SS/SSR subscriptions
+
+Each instance can manage its own region and output file. Multiple instances can share a common subscription configuration and raw cache while keeping their runtime node lists independent.
+
+### Quick start
+
+Replace the placeholder URL and adjust the proxy route, paths and listeners for your deployment. This example selects names/groups containing `香港` or `日本`, excluding `遊戲`:
+
+```ini
+listen=127.0.0.1:7575
+web=127.0.0.1:8885
+strategy=lha
+
+subscription-title=Primary subscription
+subscription=https://subscription.example.invalid/REPLACE_TOKEN
+subscription-region=asia
+subscription-match=香港
+subscription-match=日本
+subscription-exclude=遊戲
+subscription-output=/var/lib/glider/nodes-asia.conf
+
+subscription-proxy=direct://#priority=100
+subscription-proxy=socks5h://127.0.0.1:1080#priority=90
+
+subscription-interval=3600
+subscription-cache-ttl=3600
+subscription-retry-interval=7200
+subscription-cache-dir=/tmp/.subscription-cache
+lha-history-dir=/tmp/.glider-history
+```
+
+Run with `glider -config /path/to/glider.conf`, then open `http://127.0.0.1:8885/status` on the same machine. The process needs write access to the output, cache and history directories.
+
+- Repeat `subscription=` for multiple inputs. Titles are optional; when used, provide one `subscription-title=` per input in the same order.
+- Download routes use Glider's existing forwarder syntax: higher `#priority=` first, declaration order for ties. `direct://` explicitly means direct access; `socks5h://` sends destination names to the SOCKS server.
+- The normal refresh interval, cache TTL and failure retry interval are **separate settings**. A valid cache can be reused without another GET; reading it does not extend its age. Successful cached inputs remain reusable during a partial-failure retry.
+- Startup restores the last successful output file when available, then refreshes in the background. A first-time installation can fetch subscriptions and start forwarding without an old node file.
+- Matching uses SS names or SSR group + remarks, with case-sensitive literal substrings. Only SS/SSR are converted; recognized unsupported sharing schemes are counted and skipped.
+- On Linux, `systemctl kill -s HUP glider` manually requests a refresh for a service named `glider`; it still respects cache TTL. The Status page's **Refresh now** button only reloads the displayed status.
+
+### Existing static configurations and multi-instance migration
+
+Static `forward=` entries, ordinary includes and rule files remain supported. For a subscription-managed node file, replace its old `include=` entry with `subscription-output=`; **do not use both for the same file**. Disable the corresponding old script/cron updater before switching, and retain backups for rollback.
+
+Place a shared `include=` before instance-specific settings. Includes expand at their declaration point; lists append in order, later scalars override earlier values, and CLI arguments are applied last. Missing ordinary include files remain errors.
+
+See the [complete configuration, migration and rollback guide](docs/native-subscriptions.md) and the [shared + asia/hk/jp/us examples](config/subscription).
 
 ## Forwarder aliases
 
@@ -61,11 +115,11 @@ web=:8888
 
 Then open:
 
-- `/status` — forwarder health, latency, strategy and current LHA selection
+- `/status` — forwarder health, latency, current LHA selection, and named subscription results with refresh timestamps
 - `/lha` — daily LHA availability by group/node, with best/worst time windows and latency waveforms
 - `/traffic` — traffic counters grouped by source IP
 - `/logs` — recent in-memory logs
-- `/api/status` — JSON status API
+- `/api/status` — JSON forwarder and subscription status API
 - `/api/lha/history?date=YYYY-MM-DD` — daily LHA probe history and 15-minute node buckets
 - `/api/traffic` — JSON traffic API
 - `/api/logs?limit=100` — JSON log API
@@ -74,9 +128,17 @@ The WebUI is embedded into the glider binary; no separate web files or web serve
 
 ### LHA history storage
 
-History is appended to one `YYYY-MM-DD.jsonl` file per local date. By default, Glider writes it under a per-instance `glider-lha-history-<id>` directory in the configuration directory. The stable instance ID is derived from the listener, Web/DNS address and service settings.
+History is appended to one `YYYY-MM-DD.jsonl` file per local date. Since v0.22.0, the default base directory is `/tmp/.glider-history`, with a separate `glider-lha-history-<id>` subdirectory for each instance. The stable instance ID is derived from the listener, Web/DNS address and service settings. On Windows, the default base uses the system temporary directory.
 
-- `GLIDER_LHA_HISTORY_PATH` overrides the history directory. Relative paths are resolved from Glider's working directory. Give each instance a different path when overriding this variable.
+Set a persistent base directory when history must survive cleanup or reboot:
+
+```ini
+lha-history-dir=/var/lib/glider/history
+```
+
+Relative `lha-history-dir` paths resolve from the main configuration directory. Existing history is not moved automatically.
+
+- `GLIDER_LHA_HISTORY_PATH`, when nonempty, takes precedence over `lha-history-dir` and specifies the full instance history directory. Relative paths are resolved from Glider's working directory. Give each instance a different path when overriding this variable.
 - `GLIDER_LHA_HISTORY_RETENTION_DAYS` sets how many local dates to keep. The default is `30`; set it to `0` to disable automatic cleanup.
 
 Expired date files are removed at startup and when a new day's history file is opened. Cleanup only targets regular files named `YYYY-MM-DD.jsonl`.
@@ -138,7 +200,7 @@ glider -verbose -config glider.conf client
 
 The `name=` option is display metadata only. Existing forwarder URLs without a name continue to work and use their address as the display label.
 
-The v0.20.x and v0.21.0 LHA changes are observational: health checks and the existing LHA scheduling algorithm are preserved. History storage failures do not stop the proxy from running.
+The v0.20.x and v0.21.0 LHA changes added observability. v0.22.0 adds subscription-managed runtime membership changes while retaining the existing scheduling strategies. Ordinary static single-node groups still skip health checks; subscription-managed main groups check even a single node so later 1↔N updates remain supported. History storage failures do not stop the proxy from running.
 
 ## Changelog
 
@@ -152,8 +214,3 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 This project retains the license of the upstream glider project. See [LICENSE](LICENSE).
-
-### Native SS/SSR subscription
-
-See [N1 configuration, migration, tests and rollback](docs/native-subscriptions.md).
-Example configurations are in [config/subscription](config/subscription).
