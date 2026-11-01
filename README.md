@@ -37,6 +37,9 @@ strategy=lha
 subscription-title=主订阅
 subscription=https://subscription.example.invalid/REPLACE_TOKEN
 subscription-region=asia
+# 可选：仅接纳指定协议；留空不限制
+# subscription-protocol=vless
+
 subscription-match=香港
 subscription-match=日本
 subscription-exclude=遊戲

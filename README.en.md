@@ -37,6 +37,9 @@ strategy=lha
 subscription-title=Primary subscription
 subscription=https://subscription.example.invalid/REPLACE_TOKEN
 subscription-region=asia
+# Optional subscription protocol allowlist; empty permits all
+# subscription-protocol=vless
+
 subscription-match=香港
 subscription-match=日本
 subscription-exclude=遊戲

@@ -27,6 +27,9 @@ type Manager struct {
 }
 
 func New(c Config, apply func([]string, func() error) (bool, error)) (*Manager, error) {
+	if err := c.normalizeProtocols(); err != nil {
+		return nil, err
+	}
 	if len(c.Titles) != 0 && len(c.Titles) != len(c.URLs) {
 		return nil, errors.New("subscription-title count must match subscription count")
 	}
@@ -122,7 +125,7 @@ func (m *Manager) Refresh(ctx context.Context) {
 			log.F("[subscription] input %d refreshed", i+1)
 		}
 	}
-	defs := Filter(all, m.conf.Matches, m.conf.Excludes)
+	defs := m.conf.Filter(all)
 	if successes == 0 || len(defs) == 0 {
 		result := "RETAINED_EMPTY"
 		if successes == 0 {

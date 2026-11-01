@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	Titles                                           []string
+	Protocols                                        []string
 	URLs, Matches, Excludes, Paths                   []string
 	Region, Output, CacheDir                         string
 	Interval, TTL, ConnectTimeout, Timeout, MaxBytes int
@@ -19,7 +20,8 @@ type Config struct {
 func RegisterFlags(f *conflag.Conflag, c *Config) {
 	f.StringSliceVar(&c.Titles, "subscription-title", nil, "optional subscription titles, one per subscription in the same order")
 	f.IntVar(&c.RetryInterval, "subscription-retry-interval", 7200, "retry failed refresh after seconds; 0 disables extra retries")
-	f.StringSliceVar(&c.URLs, "subscription", nil, "SS/SSR subscription URL (repeatable)")
+	f.StringSliceVar(&c.URLs, "subscription", nil, "subscription URL (repeatable)")
+	f.StringSliceVar(&c.Protocols, "subscription-protocol", nil, "allowed subscription protocols: ss, ssr, anytls, trojan, vless (repeatable or comma-separated; empty allows all)")
 	f.StringSliceVar(&c.Matches, "subscription-match", nil, "literal case-sensitive include keyword (OR)")
 	f.StringSliceVar(&c.Excludes, "subscription-exclude", []string{"遊戲"}, "literal exclude keyword (repeatable; empty disables default)")
 	f.StringSliceVar(&c.Paths, "subscription-proxy", []string{"direct://"}, "download forwarder URL, larger #priority first; stable ties")
@@ -33,6 +35,9 @@ func RegisterFlags(f *conflag.Conflag, c *Config) {
 	f.IntVar(&c.MaxBytes, "subscription-max-bytes", 8<<20, "maximum response bytes")
 }
 func (c *Config) Resolve(dir string) error {
+	if err := c.normalizeProtocols(); err != nil {
+		return err
+	}
 	if len(c.URLs) == 0 {
 		if c.Output != "" {
 			return errors.New("subscription-output requires subscription")

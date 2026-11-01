@@ -20,6 +20,34 @@
 Trojan / AnyTLS 暂不转换 WebSocket、gRPC、自定义 ALPN 等扩展。
 VLESS 暂不转换 WS、gRPC、XHTTP、非 none encryption、其他 flow。
 
+## 按协议测试 LHA
+
+在实例主配置加入可选协议白名单（留空/不配置表示不限制）：
+
+```ini
+# 每次选一种协议测试；修改后重启该实例
+subscription-protocol=anytls
+# subscription-protocol=trojan
+# subscription-protocol=vless
+
+# 也支持多个协议，逗号分隔或重复配置，取并集
+# subscription-protocol=anytls,trojan
+```
+
+支持 `ss`、`ssr`、`anytls`、`trojan`、`vless`，忽略大小写和两侧空格，
+不认识的名称启动时会报错，避免拼写错误导致不受限。
+协议筛选与 `subscription-match` / `subscription-exclude` 同时生效。
+LHA 仍在筛选后的节点中自动择优；Web Status 的匹配节点数也使用同样的筛选。
+VLESS 选择包含其受支持的各种传输；它不是只选 REALITY / Vision 的子模式筛选。
+
+协议筛选仅作用于订阅节点，包括启动时恢复的旧快照；原始下载缓存保持共享，
+不同实例可以选不同协议，无需重复下载。筛选后无有效候选时保留当前可用结果，
+冷启动无匹配快照且无静态节点时保持 fail-closed，等待有效订阅。
+
+**专门测协议的实例请移除手写 `forward=` / 旧节点 `include`，并避免用单独规则组
+分流测试流量。** 这些静态节点及规则不受 `subscription-protocol` 影响。
+确认 Web 页面里仅有目标协议节点后再测试。
+
 ## 参数映射
 
 | 分享链接参数 | Glider 配置 |

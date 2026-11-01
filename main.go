@@ -34,7 +34,7 @@ func main() {
 	defer cancel()
 	static := append([]string(nil), config.Forwards...)
 	if len(config.Subscription.URLs) > 0 {
-		if defs, err := subscription.ReadSnapshot(config.Subscription.Output); err == nil && subscription.Validate(defs) == nil {
+		if defs, err := config.Subscription.ReadSnapshot(); err == nil && subscription.Validate(defs) == nil {
 			config.Forwards = append(config.Forwards, defs...)
 			log.F("[subscription] restored last successful node snapshot; freshness unknown")
 		} else if len(config.Forwards) == 0 {

@@ -135,7 +135,7 @@ func (m *Manager) endInput(i int, r inputResult, err error) {
 		s.Source = "cache"
 	}
 	s.LastSuccessAt = cloneTime(&r.at)
-	s.MatchedNodes = len(Filter(r.nodes, m.conf.Matches, m.conf.Excludes))
+	s.MatchedNodes = len(m.conf.Filter(r.nodes))
 }
 func (m *Manager) setApply(result string, retry bool) {
 	m.statusMu.Lock()

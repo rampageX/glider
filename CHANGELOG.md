@@ -4,6 +4,8 @@ All notable changes in this fork are documented here.
 
 ## [Unreleased]
 
+- Add optional `subscription-protocol` allowlist for LHA protocol testing; apply it to refreshes, matched-node status counts and restored snapshots without changing shared raw caches.
+
 - Import AnyTLS, TCP/TLS Trojan and supported TCP VLESS subscription URIs, preserving names and normalizing SNI/verification aliases without transport downgrade.
 - Add in-process VLESS TLS / REALITY + Vision clients, browser fingerprints and Vision XUDP; official build paths enable `with_utls`.
 - Enforce Trojan SHA-256 certificate pins, including CA-chain validation, and close failed TLS handshakes.

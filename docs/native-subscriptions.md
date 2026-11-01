@@ -1,6 +1,7 @@
 # 原生订阅
 
 > v0.22.0 发布版支持 SS/SSR；当前开发测试版增加 AnyTLS、Trojan 与 VLESS。
+> 支持用 `subscription-protocol=anytls`（或 trojan / vless）限定订阅协议。
 > 新增参数映射、REALITY / Vision 范围及构建要求见[协议适配说明](subscription-protocols.md)。
 
 此功能只更新默认 main 节点组。四个进程仍独立监听、筛选、生成文件和应用节点；
