@@ -39,7 +39,7 @@ jobs:
           cache: true
 
       - name: Test
-        run: go test -v ./...
+        run: go test -tags with_utls -v ./...
 
       # Release branches must point at main. The repository-scoped Actions token
       # creates the tag, and this same job publishes (token pushes do not trigger

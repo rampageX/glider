@@ -2,6 +2,14 @@
 
 All notable changes in this fork are documented here.
 
+## [Unreleased]
+
+- Import AnyTLS, TCP/TLS Trojan and supported TCP VLESS subscription URIs, preserving names and normalizing SNI/verification aliases without transport downgrade.
+- Add in-process VLESS TLS / REALITY + Vision clients, browser fingerprints and Vision XUDP; official build paths enable `with_utls`.
+- Enforce Trojan SHA-256 certificate pins, including CA-chain validation, and close failed TLS handshakes.
+- Keep a licensed, narrowly patched sing-vmess Vision client copy to preserve GC pointer tracking and pass checkptr/race instrumentation.
+- Add independent Xray REALITY/Vision interoperability tests, imported TLS protocol transfer tests and protocol/rollback documentation.
+
 ## [0.22.0] - 2026-11-01
 
 ### Added

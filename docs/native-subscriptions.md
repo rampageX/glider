@@ -1,4 +1,7 @@
-# 原生 SS/SSR 订阅（v0.22.0）
+# 原生订阅
+
+> v0.22.0 发布版支持 SS/SSR；当前开发测试版增加 AnyTLS、Trojan 与 VLESS。
+> 新增参数映射、REALITY / Vision 范围及构建要求见[协议适配说明](subscription-protocols.md)。
 
 此功能只更新默认 main 节点组。四个进程仍独立监听、筛选、生成文件和应用节点；
 共享的是原始订阅缓存，不共享运行中节点。没有通用配置热重载，不调用外部下载工具、脚本或 systemctl。
@@ -99,7 +102,7 @@ URL 编码的 name 按 query 原样解码；未编码的手写 name 仍兼容旧
 普通静态 forward 仍使用原格式。
 SS 插件、未知扩展、当前不支持的算法/SSR 协议或混淆明确计数并跳过。
 其他格式损坏的节点导致整个订阅拒绝，不接受其余半份节点。
-只支持 SS/SSR，不转换 VMess/VLESS，不导出 JSON。
+v0.22.0 发布版只转换 SS/SSR；当前开发测试版另见顶部协议适配说明。不导出 JSON。
 
 启动先校验已有输出文件，再作为上次成功快照恢复，随后监听服务、后台刷新。
 生成文件首次不存在不报 include 错误；没有快照也没有静态节点时先拒绝转发，后台重试。
@@ -204,8 +207,8 @@ LHA history 新增 `lha-history-dir=/tmp/.glider-history`，下面仍按实例 I
 
 Base64 解码后和逐行明文输入均允许 UTF-8 BOM、空行、以 # / ; / // 开头的注释，
 以及 MAX=无符号十进制整数、STATUS=说明、REMARKS=说明 元信息行。这些行不是节点，不参加筛选。
-识别 VMess、VLESS、Trojan、Hysteria/Hysteria2/hy2、TUIC、WireGuard、Snell 分享链接，
-按不支持的协议明确计数跳过；本版不转换这些协议。SS/SSR 的顺序及重复项仍保留。
+v0.22.0 发布版识别 VMess、VLESS、Trojan、Hysteria/Hysteria2/hy2、TUIC、WireGuard、Snell 分享链接，
+按不支持的协议明确计数跳过；该发布版不转换这些协议。开发测试版对 VLESS / Trojan / AnyTLS 的新增支持见顶部说明。SS/SSR 的顺序及重复项仍保留。
 未知文本、未知 scheme、非法 MAX 数字、损坏 SS/SSR 均继续整份拒绝，不接纳半份结果。
 仅含元信息或不支持协议而没有任何有效 SS/SSR 的输入也不会作为成功缓存或清空运行节点。
 

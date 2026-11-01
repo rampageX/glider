@@ -55,6 +55,8 @@ func Parse(body []byte) (nodes []Node, skipped int, err error) {
 		switch {
 		case strings.HasPrefix(line, "ss://"):
 			n, err = parseSS(line)
+		case class == "anytls" || class == "trojan" || class == "vless":
+			n, err = parseModern(line)
 		case strings.HasPrefix(line, "ssr://"):
 			n, err = parseSSR(line)
 		default:

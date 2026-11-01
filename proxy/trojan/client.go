@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 
 	"github.com/nadoo/glider/pkg/log"
@@ -35,10 +36,16 @@ func NewTrojanDialer(s string, d proxy.Dialer) (proxy.Dialer, error) {
 		return nil, fmt.Errorf("[trojan] create instance error: %s", err)
 	}
 
+	u, _ := url.Parse(s)
+	verifyPin, err := certificatePin(u.Query().Get("pcs"), t.serverName)
+	if err != nil {
+		return nil, err
+	}
 	t.tlsConfig = &tls.Config{
-		ServerName:         t.serverName,
-		InsecureSkipVerify: t.skipVerify,
-		MinVersion:         tls.VersionTLS12,
+		VerifyPeerCertificate: verifyPin,
+		ServerName:            t.serverName,
+		InsecureSkipVerify:    t.skipVerify,
+		MinVersion:            tls.VersionTLS12,
 	}
 
 	if t.certFile != "" {
@@ -80,6 +87,7 @@ func (s *Trojan) dial(network, addr string) (net.Conn, error) {
 	if s.withTLS {
 		tlsConn := tls.Client(rc, s.tlsConfig)
 		if err := tlsConn.Handshake(); err != nil {
+			rc.Close()
 			return nil, err
 		}
 		rc = tlsConn

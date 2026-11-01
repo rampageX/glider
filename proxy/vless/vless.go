@@ -86,5 +86,8 @@ func init() {
 	proxy.AddUsage("vless", `
 VLESS scheme:
   vless://uuid@host:port[?fallback=127.0.0.1:80]
+  vless://uuid@host:port?security=tls[&serverName=DOMAIN][&flow=xtls-rprx-vision]
+  vless://uuid@host:port?security=reality&serverName=DOMAIN&pbk=KEY&sid=ID[&fp=chrome][&flow=xtls-rprx-vision]
+  REALITY requires a build with -tags with_utls. Sharing links must pass through subscription conversion.
 `)
 }

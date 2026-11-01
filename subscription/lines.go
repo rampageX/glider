@@ -33,9 +33,9 @@ func lineClass(line string) string {
 	scheme, _, ok := strings.Cut(line, "://")
 	if ok {
 		switch scheme {
-		case "ss", "ssr":
+		case "ss", "ssr", "anytls", "trojan", "vless":
 			return scheme
-		case "vmess", "vless", "trojan", "hysteria", "hysteria2", "hy2", "tuic", "wireguard", "snell":
+		case "vmess", "hysteria", "hysteria2", "hy2", "tuic", "wireguard", "snell":
 			return "unsupported-" + scheme
 		}
 		return "unknown-scheme"
@@ -48,7 +48,7 @@ func ignoredLine(class string) bool {
 func looksPlain(s string) bool {
 	for _, line := range strings.Split(s, "\n") {
 		class := lineClass(line)
-		if class == "ss" || class == "ssr" || strings.HasPrefix(class, "metadata-") || class == "comment" || strings.HasPrefix(class, "unsupported-") {
+		if class == "ss" || class == "ssr" || class == "anytls" || class == "trojan" || class == "vless" || strings.HasPrefix(class, "metadata-") || class == "comment" || strings.HasPrefix(class, "unsupported-") {
 			return true
 		}
 	}

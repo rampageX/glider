@@ -8,7 +8,9 @@
 
 ## v0.22.0 更新亮点
 
-**原生 SS/SSR 订阅、运行中更新节点、Web 页面查看订阅状态。**
+**原生订阅、运行中更新节点、Web 页面查看订阅状态。**
+
+开发测试版新增 **AnyTLS / Trojan / VLESS（TLS / REALITY + Vision）订阅转换**。范围、构建方式和实机验证步骤见[协议适配说明](docs/subscription-protocols.md)。
 
 - **内置订阅管理：** 支持多个 SS/SSR 订阅，保留节点名称，使用可配置的字面关键词筛选区域，无需外部更新脚本。
 - **运行中更新：** 自动生成标准 `forward=` 节点文件，无需重启即可应用变化。定义未变的节点保留健康状态；所有订阅失败或候选列表为空时保留当前节点。部分失败时，仅使用成功的订阅输入。
@@ -56,7 +58,7 @@ lha-history-dir=/tmp/.glider-history
 - 下载路径复用 Glider 的 forwarder 语法：`#priority=` 数值越大越先尝试，同优先级按声明顺序。`direct://` 明确表示直连；`socks5h://` 由 SOCKS 服务器解析目标域名。
 - **正常刷新周期、缓存 TTL、失败重试间隔是三个独立设置。** 有效缓存可以直接复用，读取不会延长有效期；部分失败后重试时，成功输入的有效缓存仍可复用。
 - 启动时若存在上次成功生成的节点文件，先恢复服务，再后台刷新；首次安装即使没有旧节点文件，也能获取订阅并开始转发。
-- 筛选采用区分大小写的字面子串匹配：SS 匹配节点名，SSR 匹配 group + remarks。订阅转换目前仅支持 SS/SSR；可识别但不支持的分享协议会统计并跳过。
+- 筛选采用区分大小写的字面子串匹配：SS 匹配节点名，SSR 匹配 group + remarks。本开发测试版转换 SS/SSR、AnyTLS、Trojan 与受支持的 VLESS 配置；可识别但不支持的分享协议会统计并跳过。
 - Linux 下可用 `systemctl kill -s HUP glider` 请求名为 `glider` 的服务手动刷新，仍遵守缓存 TTL。Status 页面的 **Refresh now** 按钮只刷新页面显示的数据。
 
 ### 从静态配置迁移与四实例部署
@@ -72,7 +74,7 @@ lha-history-dir=/tmp/.glider-history
 在现有 forwarder 的 `#OPTIONS` 参数中加入 `name=`，即可设置便于辨认的显示名称：
 
 ```ini
-forward=trojan://user:pass@example.com:443#name=US-Trojan
+forward=trojan://password@example.com:443#name=US-Trojan
 forward=socks5://127.0.0.1:1080#priority=10&name=Local-SOCKS
 forward=anytls://password@example.com:443#name="AnyTLS US"
 ```
@@ -158,7 +160,7 @@ lha-history-dir=/var/lib/glider/history
 
 Glider 支持多种监听、转发、协议转换和代理链，包括 HTTP、SOCKS4/4A/5、Shadowsocks、Trojan、VLESS、VMess、SSH、TLS、WebSocket、KCP、Unix socket、UDP/TCP 隧道、AnyTLS 等底层项目支持的协议。
 
-**转发协议支持与订阅转换支持不同：v0.22.0 的原生订阅转换仅支持 SS/SSR。**
+**转发协议支持与订阅转换支持不同：v0.22.0 发布版仅转换 SS/SSR；本开发测试版新增的协议范围见[适配说明](docs/subscription-protocols.md)。**
 
 详细协议 URI 语法与配置示例见 [config/examples](config/examples)，也可运行：
 

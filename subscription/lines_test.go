@@ -60,7 +60,7 @@ func TestUnknownAndMalformedRemainAtomic(t *testing.T) {
 	}
 }
 func TestMixedColdStartWithoutSnapshot(t *testing.T) {
-	text := b64("MAX=0\nSTATUS=notice\n" + ss("美国") + "\nvless://unsupported")
+	text := b64("MAX=0\nSTATUS=notice\n" + ss("美国") + "\nhysteria2://unsupported")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, text) }))
 	defer server.Close()
 	c := testConfig(t.TempDir(), server.URL)

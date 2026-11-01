@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"net/url"
 
 	"github.com/nadoo/glider/pkg/log"
 	"github.com/nadoo/glider/pkg/pool"
@@ -13,6 +14,16 @@ import (
 
 // NewVLessDialer returns a vless proxy dialer.
 func NewVLessDialer(s string, dialer proxy.Dialer) (proxy.Dialer, error) {
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, errors.New("invalid VLESS URL")
+	}
+	if err := ValidateClientURL(s); err != nil {
+		return nil, err
+	}
+	if security := u.Query().Get("security"); security == "tls" || security == "reality" {
+		return newModernClient(s, dialer)
+	}
 	return NewVLess(s, dialer, nil)
 }
 

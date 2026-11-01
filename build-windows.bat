@@ -49,7 +49,7 @@ if exist "build\glider.exe" (
 
 echo [BUILD] Compiling glider.exe ...
 echo.
-go build -trimpath -ldflags="-s -w" -o "build\glider.exe" .
+go build -tags with_utls -trimpath -ldflags="-s -w" -o "build\glider.exe" .
 if errorlevel 1 goto :FAIL
 
 if not exist "build\glider.exe" (

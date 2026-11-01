@@ -76,6 +76,11 @@ func nodeProtocol(line string) string {
 	if strings.HasPrefix(line, "ssr://") {
 		return "ssr"
 	}
+	for _, scheme := range []string{"vless", "trojan", "anytls"} {
+		if strings.HasPrefix(line, scheme+"://") {
+			return scheme
+		}
+	}
 	return "other"
 }
 func bodyKind(body []byte) string {

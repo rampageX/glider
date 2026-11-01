@@ -1,7 +1,7 @@
 name: Native subscription test (N1)
 on:
   push:
-    branches: ["native-subscriptions-20261031"]
+    branches: ["native-subscriptions-20261031", "subscription-protocols-20261101"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,25 +14,34 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Independent Xray interoperability fixture
+        run: |
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/xray.zip" https://github.com/XTLS/Xray-core/releases/download/v1.8.24/Xray-linux-64.zip
+          echo "47a860787e823474a358d6bca536547df6dd08b69c6de482ea92a9e7e8f8969c  $RUNNER_TEMP/xray.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/xray"
+          unzip -q "$RUNNER_TEMP/xray.zip" -d "$RUNNER_TEMP/xray"
+          chmod +x "$RUNNER_TEMP/xray/xray"
+          echo "GLIDER_XRAY_TEST_BINARY=$RUNNER_TEMP/xray/xray" >> "$GITHUB_ENV"
       - name: Unit, integration, subprocess and race tests
-        run: go test -race -count=1 ./...
+        run: go test -tags with_utls -race -count=1 ./...
       - name: Vet
-        run: go vet ./...
+        run: go vet -tags with_utls ./...
       - name: Build N1 Linux ARM64 and check Windows compatibility
         run: |
           mkdir -p package
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w -X main.version=0.22.0-subscription-$(git rev-parse --short HEAD)" -o package/glider .
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o /tmp/glider.exe .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -tags with_utls -trimpath -ldflags="-s -w -X main.version=0.22.0-protocols-$(git rev-parse --short HEAD)" -o package/glider .
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags with_utls -o /tmp/glider.exe .
           cp -r config/subscription package/config
-          cp docs/native-subscriptions.md package/README.md
+          cp docs/subscription-protocols.md package/README.md
+          cp docs/native-subscriptions.md package/native-subscriptions.md
           cp LICENSE package/
           git rev-parse HEAD > package/SOURCE_COMMIT
           cd package
           sha256sum glider > SHA256SUMS
-          tar -czf ../glider-native-subscription-linux-arm64.tar.gz .
+          tar -czf ../glider-protocols-linux-arm64.tar.gz .
       - uses: actions/upload-artifact@v6
         with:
-          name: glider-native-subscription-linux-arm64-${{ github.sha }}
-          path: glider-native-subscription-linux-arm64.tar.gz
+          name: glider-protocols-linux-arm64-${{ github.sha }}
+          path: glider-protocols-linux-arm64.tar.gz
           retention-days: 30
           if-no-files-found: error

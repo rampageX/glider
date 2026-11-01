@@ -8,6 +8,8 @@ builds:
   - id: windows
     env:
       - CGO_ENABLED=0
+    tags:
+      - with_utls
     goos:
       - windows
     goarch:
@@ -21,6 +23,8 @@ builds:
   - id: linux
     env:
       - CGO_ENABLED=0
+    tags:
+      - with_utls
     goos:
       - linux
     goarch:

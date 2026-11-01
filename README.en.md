@@ -8,7 +8,9 @@ This repository is a maintained fork derived from [nadoo/glider](https://github.
 
 ## v0.22.0 highlights
 
-**Native SS/SSR subscriptions, live node updates, and subscription status in the WebUI.**
+**Native subscriptions, live node updates, and subscription status in the WebUI.**
+
+The development test build adds **AnyTLS, Trojan and VLESS (TLS / REALITY + Vision) subscription conversion**. See [scope, build flags and validation](docs/subscription-protocols.md).
 
 - **Built-in subscription management:** download and parse multiple SS/SSR subscriptions, preserve node names, and filter regions using configurable literal keywords. No external update script is required.
 - **Update nodes while running:** generate standard `forward=` files and apply changes without restarting Glider. Identical definitions keep their health state; all-input failures or empty candidates retain the current nodes. Partial failures exclude the failed input.
@@ -56,7 +58,7 @@ Run with `glider -config /path/to/glider.conf`, then open `http://127.0.0.1:8885
 - Download routes use Glider's existing forwarder syntax: higher `#priority=` first, declaration order for ties. `direct://` explicitly means direct access; `socks5h://` sends destination names to the SOCKS server.
 - The normal refresh interval, cache TTL and failure retry interval are **separate settings**. A valid cache can be reused without another GET; reading it does not extend its age. Successful cached inputs remain reusable during a partial-failure retry.
 - Startup restores the last successful output file when available, then refreshes in the background. A first-time installation can fetch subscriptions and start forwarding without an old node file.
-- Matching uses SS names or SSR group + remarks, with case-sensitive literal substrings. Only SS/SSR are converted; recognized unsupported sharing schemes are counted and skipped.
+- Matching uses SS names or SSR group + remarks, with case-sensitive literal substrings. This development build converts SS/SSR, AnyTLS, Trojan and supported VLESS configurations; recognized unsupported sharing schemes are counted and skipped.
 - On Linux, `systemctl kill -s HUP glider` manually requests a refresh for a service named `glider`; it still respects cache TTL. The Status page's **Refresh now** button only reloads the displayed status.
 
 ### Existing static configurations and multi-instance migration
@@ -72,7 +74,7 @@ See the [complete configuration, migration and rollback guide](docs/native-subsc
 Forwarder options use the existing `#OPTIONS` query syntax. Add `name=` to give a node a readable display name:
 
 ```ini
-forward=trojan://user:pass@example.com:443#name=US-Trojan
+forward=trojan://password@example.com:443#name=US-Trojan
 forward=socks5://127.0.0.1:1080#priority=10&name=Local-SOCKS
 forward=anytls://password@example.com:443#name="AnyTLS US"
 ```
