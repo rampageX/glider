@@ -88,6 +88,12 @@ VLESS scheme:
   vless://uuid@host:port[?fallback=127.0.0.1:80]
   vless://uuid@host:port?security=tls[&serverName=DOMAIN][&flow=xtls-rprx-vision]
   vless://uuid@host:port?security=reality&serverName=DOMAIN&pbk=KEY&sid=ID[&fp=chrome][&flow=xtls-rprx-vision]
-  REALITY requires a build with -tags with_utls. Sharing links must pass through subscription conversion.
+  REALITY requires a build with -tags with_utls; included in official packages.
+  Options: serverName, skipVerify=true/false (TLS only), alpn=h2,http/1.1.
+  REALITY: pbk=32-byte Base64URL X25519 public key; sid=0..8 bytes of hex.
+  Fingerprints: chrome (default), firefox, safari, edge, ios. No authentication bypass.
+  Supported Vision flow: xtls-rprx-vision; TLS 1.3 / REALITY required; XUDP supported.
+  Client supports TCP transport. WS/gRPC/XHTTP are not supported by this URL.
+  Sharing-link aliases (sni/servername/type/encryption) are mapped by subscription conversion.
 `)
 }

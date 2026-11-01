@@ -174,6 +174,7 @@ AnyTLS client scheme:
   anytls://password@host:port[?idleSessionCheckInterval=30s][&idleSessionTimeout=30s][&minIdleSession=5]
   anytls://password@host:port[?disableReuse=true]            (debug/strict 1:1 connections)
   anytlsc://password@host:port     (cleartext, without TLS)
+  Time parameters: bare numbers are seconds; s/m/h/d/w and compound values supported.
 
 AnyTLS server scheme:
   anytls://password@host:port?cert=PATH&key=PATH[&fallback=127.0.0.1:80]

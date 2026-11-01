@@ -6,24 +6,21 @@ A compact multi-protocol forward proxy with flexible proxy chains, rule-based ro
 
 This repository is a maintained fork derived from [nadoo/glider](https://github.com/nadoo/glider) and [0xec/glider](https://github.com/0xec/glider). It keeps glider's lightweight design while adding practical observability for latency-based high availability (LHA) operation.
 
-## v0.22.0 highlights
+## v0.23.0 highlights
 
-**Native subscriptions, live node updates, and subscription status in the WebUI.**
+**Five subscription protocols, in-process REALITY + Vision, and clearer LHA testing/status.**
 
-The development test build adds **AnyTLS, Trojan and VLESS (TLS / REALITY + Vision) subscription conversion**. See [scope, build flags and validation](docs/subscription-protocols.md).
+- Import SS, SSR, AnyTLS, Trojan TCP/TLS, and VLESS TCP (plain / TLS / REALITY) sharing links. TLS / REALITY support Vision; no external Xray process is required.
+- Use `subscription-protocol=anytls`, `trojan` or `vless` to constrain subscription candidates. Comma-separated/repeated entries form a union; empty permits all. It works in common includes and instance configs.
+- Write time values as `1m`, `2h`, `1d` or `1w`. Bare timeout/interval/TTL values remain seconds; **bare `checktolerance` remains milliseconds**, so `1000` equals `1s`.
+- Status displays the actual protocol and transport chains, independently of node names.
+- Retain the 0.22 subscription manager: region filtering, live updates, shared raw caches, ordered download routes, status and two-hour failure retries.
 
-- **Built-in subscription management:** download and parse multiple SS/SSR subscriptions, preserve node names, and filter regions using configurable literal keywords. No external update script is required.
-- **Update nodes while running:** generate standard `forward=` files and apply changes without restarting Glider. Identical definitions keep their health state; all-input failures or empty candidates retain the current nodes. Partial failures exclude the failed input.
-- **Independent download fallback per subscription:** ordered direct/proxy GET attempts, a shared cross-process cache, and atomic cache/output writes.
-- **Visible subscription health:** optional titles, masked URLs, individual success/failure results, check/download timestamps, and the next refresh time on Status.
-- **Conservative failure retries:** a separate retry interval defaults to **7200 seconds (two hours)**; a shorter normal refresh interval does not bring a failed retry forward.
-- **Configurable storage and diagnostics:** Linux cache defaults to `/tmp/.subscription-cache`, LHA history to `/tmp/.glider-history`; `-verbose` adds diagnostics without printing subscription URLs, tokens, or response bodies.
+The user confirmed real-device connectivity for **AnyTLS, Trojan and VLESS REALITY + Vision**. Throughput and long-running stability remain under observation; other build architectures have not all been device-tested.
 
-[Download v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.22.0.md)
+[Download v0.23.0](https://github.com/rampageX/glider/releases/tag/v0.23.0) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.23.0/glider_0.23.0_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.23.0.md)
 
-The test build also supports duration suffixes (for example `subscription-interval=2h`) and shows node protocols on Status. Bare `checktolerance` values remain milliseconds.
-
-## Native SS/SSR subscriptions
+## Native subscriptions (SS / SSR / AnyTLS / Trojan / VLESS)
 
 Each instance can manage its own region and output file. Multiple instances can share a common subscription configuration and raw cache while keeping their runtime node lists independent.
 
@@ -50,9 +47,9 @@ subscription-output=/var/lib/glider/nodes-asia.conf
 subscription-proxy=direct://#priority=100
 subscription-proxy=socks5h://127.0.0.1:1080#priority=90
 
-subscription-interval=3600
-subscription-cache-ttl=3600
-subscription-retry-interval=7200
+subscription-interval=1h
+subscription-cache-ttl=1h
+subscription-retry-interval=2h
 subscription-cache-dir=/tmp/.subscription-cache
 lha-history-dir=/tmp/.glider-history
 ```
@@ -63,7 +60,7 @@ Run with `glider -config /path/to/glider.conf`, then open `http://127.0.0.1:8885
 - Download routes use Glider's existing forwarder syntax: higher `#priority=` first, declaration order for ties. `direct://` explicitly means direct access; `socks5h://` sends destination names to the SOCKS server.
 - The normal refresh interval, cache TTL and failure retry interval are **separate settings**. A valid cache can be reused without another GET; reading it does not extend its age. Successful cached inputs remain reusable during a partial-failure retry.
 - Startup restores the last successful output file when available, then refreshes in the background. A first-time installation can fetch subscriptions and start forwarding without an old node file.
-- Matching uses SS names or SSR group + remarks, with case-sensitive literal substrings. This development build converts SS/SSR, AnyTLS, Trojan and supported VLESS configurations; recognized unsupported sharing schemes are counted and skipped.
+- Matching uses SS names or SSR group + remarks, with case-sensitive literal substrings. This release converts SS/SSR, AnyTLS, Trojan and supported VLESS configurations; recognized unsupported sharing schemes are counted and skipped.
 - On Linux, `systemctl kill -s HUP glider` manually requests a refresh for a service named `glider`; it still respects cache TTL. The Status page's **Refresh now** button only reloads the displayed status.
 
 ### Existing static configurations and multi-instance migration
@@ -137,7 +134,7 @@ The WebUI is embedded into the glider binary; no separate web files or web serve
 
 ### LHA history storage
 
-History is appended to one `YYYY-MM-DD.jsonl` file per local date. Since v0.22.0, the default base directory is `/tmp/.glider-history`, with a separate `glider-lha-history-<id>` subdirectory for each instance. The stable instance ID is derived from the listener, Web/DNS address and service settings. On Windows, the default base uses the system temporary directory.
+History is appended to one `YYYY-MM-DD.jsonl` file per local date. Since v0.23.0, the default base directory is `/tmp/.glider-history`, with a separate `glider-lha-history-<id>` subdirectory for each instance. The stable instance ID is derived from the listener, Web/DNS address and service settings. On Windows, the default base uses the system temporary directory.
 
 Set a persistent base directory when history must survive cleanup or reboot:
 
@@ -179,8 +176,10 @@ glider -help
 
 Go version requirements are defined by `go.mod`. A current stable Go toolchain is recommended.
 
+REALITY requires the `with_utls` build tag; official release packages enable it.
+
 ```bash
-go build -trimpath -ldflags="-s -w" -o glider .
+go build -tags with_utls -trimpath -ldflags="-s -w" -o glider .
 ```
 
 On Windows, clone the repository and double-click:
@@ -209,7 +208,7 @@ glider -verbose -config glider.conf client
 
 The `name=` option is display metadata only. Existing forwarder URLs without a name continue to work and use their address as the display label.
 
-The v0.20.x and v0.21.0 LHA changes added observability. v0.22.0 adds subscription-managed runtime membership changes while retaining the existing scheduling strategies. Ordinary static single-node groups still skip health checks; subscription-managed main groups check even a single node so later 1↔N updates remain supported. History storage failures do not stop the proxy from running.
+The v0.20.x and v0.21.0 LHA changes added observability. v0.23.0 adds subscription-managed runtime membership changes while retaining the existing scheduling strategies. Ordinary static single-node groups still skip health checks; subscription-managed main groups check even a single node so later 1↔N updates remain supported. History storage failures do not stop the proxy from running.
 
 ## Changelog
 

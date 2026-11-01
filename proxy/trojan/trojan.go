@@ -76,8 +76,10 @@ func NewTrojan(s string, d proxy.Dialer, p proxy.Proxy) (*Trojan, error) {
 func init() {
 	proxy.AddUsage("trojan", `
 Trojan client scheme:
-  trojan://pass@host:port[?serverName=SERVERNAME][&skipVerify=true][&cert=PATH]
+  trojan://pass@host:port[?serverName=SERVERNAME][&skipVerify=true][&cert=PATH][&pcs=HEX_SHA256]
   trojanc://pass@host:port     (cleartext, without TLS)
+  pcs: one hex SHA-256 certificate pin, enforced even with skipVerify=true.
+  Sharing-link sni/peer/allowInsecure aliases are normalized by subscription conversion.
   
 Trojan server scheme:
   trojan://pass@host:port?cert=PATH&key=PATH[&fallback=127.0.0.1]

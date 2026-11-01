@@ -185,7 +185,7 @@ func usage() {
 }
 
 var usage1 = `
-Usage: glider [-listen URL]... [-forward URL]... [OPTION]...
+Usage: glider [-config FILE] [-listen URL]... [-forward URL]... [OPTION]...
 
   e.g. glider -config /etc/glider/glider.conf
        glider -listen :8443 -forward socks5://serverA:1080 -forward socks5://serverB:1080 -verbose
@@ -215,10 +215,41 @@ SCHEME:
 Forwarder Options: FORWARD_URL#OPTIONS
    priority : the priority of that forwarder, the larger the higher, default: 0
    interface: the local interface or ip address used to connect remote server.
+   name     : display name; subscriptions preserve sharing-link node names.
 
    e.g. -forward socks5://server:1080#priority=100
         -forward socks5://server:1080#interface=eth0
         -forward socks5://server:1080#priority=100&interface=192.168.1.99
+
+Native subscriptions (main group):
+   subscription=URL                      repeat for multiple inputs
+   subscription-title=TITLE              optional; one per URL in order
+   subscription-protocol=vless           allowlist: ss/ssr/anytls/trojan/vless
+   subscription-protocol=anytls,trojan    repeat or comma-separate; union, not override
+   subscription-match=KEYWORD            literal name/group includes (OR)
+   subscription-exclude=KEYWORD          excludes; empty disables default 遊戲
+   subscription-output=FILE              managed forward snapshot; DO NOT include it
+   subscription-interval=1h              normal refresh; independent of cache TTL
+   subscription-cache-ttl=1d             raw cache freshness; 0 downloads every refresh
+   subscription-retry-interval=2h        failed refresh retry; 0 disables extra retries
+   subscription-proxy=direct://          ordered routes; larger #priority first
+
+   Supported sharing links: SS, SSR, AnyTLS, Trojan TCP/TLS, VLESS TCP
+   (plain/TLS/REALITY; TLS/REALITY can use Vision). VMess/Hysteria2 and unsupported
+   transports are counted and skipped. REALITY requires a with_utls build.
+   Protocol filters combine with region filters and apply to restored snapshots.
+   Common/instance lists append. Manual forwarders and rule groups are independent.
+   Configuration changes require restart; subscription node updates apply live.
+   Status displays protocols and subscription results. -verbose adds safe diagnostics.
+   SIGHUP requests a refresh and still respects cache TTL; Web Refresh only reloads UI.
+
+Time values:
+   Bare interval/timeout/TTL numbers are SECONDS; suffixes: s/m/h/d/w.
+   Examples: 60 = 1m, 2h = 7200, 1d = 24h, 1w = 7d, 1h30m = 90m.
+   IMPORTANT: bare checktolerance is MILLISECONDS: 1000 = 1000ms = 1s.
+   DHCP LEASE_MINUTES bare values remain minutes; history retention DAYS remain days.
+   Common includes, instance configs, rule files and CLI accept suffixes.
+   Values must fit each option's original precision; overflow/unknown units fail.
 
 Services:
    dhcpd: service=dhcpd,INTERFACE,START_IP,END_IP,LEASE_MINUTES[,MAC=IP,MAC=IP...]
@@ -233,11 +264,15 @@ Help:
 
 see README.md and glider.conf.example for more details.
 --
-glider %s, https://github.com/nadoo/glider (glider.proxy@gmail.com)
+glider %s, https://github.com/rampageX/glider
+Based on nadoo/glider and 0xec/glider.
 `
 
 var examples = `
 Examples:
+  glider -config glider.conf -subscription-protocol=vless -subscription-interval=2h
+    -limit subscription nodes to VLESS; manual/rule forwarders are not filtered.
+
   glider -config glider.conf
     -run glider with specified config file.
   

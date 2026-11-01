@@ -20,14 +20,14 @@ type Config struct {
 
 func RegisterFlags(f *conflag.Conflag, c *Config) {
 	f.StringSliceVar(&c.Titles, "subscription-title", nil, "optional subscription titles, one per subscription in the same order")
-	timevalue.SecondsVar(f, &c.RetryInterval, "subscription-retry-interval", 7200, "retry failed refresh after seconds; 0 disables extra retries")
-	f.StringSliceVar(&c.URLs, "subscription", nil, "subscription URL (repeatable)")
-	f.StringSliceVar(&c.Protocols, "subscription-protocol", nil, "allowed subscription protocols: ss, ssr, anytls, trojan, vless (repeatable or comma-separated; empty allows all)")
+	timevalue.SecondsVar(f, &c.RetryInterval, "subscription-retry-interval", 7200, "retry failed refresh; default 2h; 0 disables extra retries")
+	f.StringSliceVar(&c.URLs, "subscription", nil, "SS/SSR/AnyTLS/Trojan/VLESS subscription URL (repeatable)")
+	f.StringSliceVar(&c.Protocols, "subscription-protocol", nil, "subscription-only protocol allowlist: ss/ssr/anytls/trojan/vless; repeated/common/instance entries UNION; empty permits all; manual forwards/rules unaffected")
 	f.StringSliceVar(&c.Matches, "subscription-match", nil, "literal case-sensitive include keyword (OR)")
 	f.StringSliceVar(&c.Excludes, "subscription-exclude", []string{"遊戲"}, "literal exclude keyword (repeatable; empty disables default)")
 	f.StringSliceVar(&c.Paths, "subscription-proxy", []string{"direct://"}, "download forwarder URL, larger #priority first; stable ties")
 	f.StringVar(&c.Region, "subscription-region", "", "instance region label")
-	f.StringVar(&c.Output, "subscription-output", "", "managed forward file; DO NOT include it")
+	f.StringVar(&c.Output, "subscription-output", "", "managed forward snapshot file; DO NOT include it; restored nodes obey protocol allowlist")
 	f.StringVar(&c.CacheDir, "subscription-cache-dir", filepath.Join(os.TempDir(), ".subscription-cache"), "shared raw subscription cache directory")
 	timevalue.SecondsVar(f, &c.Interval, "subscription-interval", 3600, "refresh interval seconds, independent of cache TTL")
 	timevalue.SecondsVar(f, &c.TTL, "subscription-cache-ttl", 3600, "raw cache validity seconds")

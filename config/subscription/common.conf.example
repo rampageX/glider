@@ -5,9 +5,9 @@ subscription=https://subscription.example.invalid/REPLACE_TOKEN_1
 subscription-title=订阅二
 subscription=https://subscription.example.invalid/REPLACE_TOKEN_2
 subscription-cache-dir=/tmp/.subscription-cache
-subscription-cache-ttl=3600
-subscription-interval=3600
-subscription-retry-interval=7200
+subscription-cache-ttl=1h
+subscription-interval=1h
+subscription-retry-interval=2h
 subscription-connect-timeout=3
 subscription-timeout=15
 subscription-max-bytes=8388608
@@ -22,3 +22,10 @@ subscription-proxy=socks5h://127.0.0.1:7778#priority=50
 
 # Per-instance history subdirectories are created below this base.
 lha-history-dir=/tmp/.glider-history
+
+# Optional subscription-only protocol allowlist; empty/unset permits all.
+# Values: ss, ssr, anytls, trojan, vless. Repeated/common/instance entries UNION.
+# subscription-protocol=vless
+# subscription-protocol=anytls,trojan
+# Manual forward= entries and separate rule groups are not filtered.
+# Time suffixes: s/m/h/d/w. Bare checktolerance remains MILLISECONDS.

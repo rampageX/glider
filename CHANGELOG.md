@@ -2,7 +2,9 @@
 
 All notable changes in this fork are documented here.
 
-## [Unreleased]
+## [0.23.0] - 2026-11-01
+
+- User confirmed real-device connectivity for AnyTLS, Trojan and VLESS REALITY + Vision; throughput and long-term stability remain under observation.
 
 - Accept s/m/h/d/w time suffixes for interval, timeout and TTL settings, including common/rule configs, while preserving bare-number milliseconds for checktolerance and explicit legacy minute/day fields.
 - Show each forwarder's protocol (and transport chains) in the Status page and API.

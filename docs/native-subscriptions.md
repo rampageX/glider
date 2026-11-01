@@ -1,6 +1,6 @@
 # 原生订阅
 
-> v0.22.0 发布版支持 SS/SSR；当前开发测试版增加 AnyTLS、Trojan 与 VLESS。
+> v0.23.0 支持 SS、SSR、AnyTLS、Trojan 与 VLESS 的指定配置。
 > 支持用 `subscription-protocol=anytls`（或 trojan / vless）限定订阅协议。
 > 新增参数映射、REALITY / Vision 范围及构建要求见[协议适配说明](subscription-protocols.md)。
 
@@ -31,6 +31,7 @@ Web 端口是示例，部署时保留已有端口。也保留已有 listen、规
 | subscription-title | 可不写 | 可重复；按 subscription 顺序对应，设置时数量必须与订阅相同；空标题自动用编号 |
 | subscription-retry-interval | 7200 | 部分/全部订阅失败或应用失败后的重试秒数；0 关闭额外重试 |
 | subscription | 无 | 可重复；按声明顺序合并，各订阅独立尝试下载路径 |
+| subscription-protocol | 空 | 可重复或逗号分隔；ss/ssr/anytls/trojan/vless 白名单，空表示不限制；common 与实例取并集；只筛选订阅节点和恢复快照 |
 | subscription-region | 空 | 区域说明标签，不推断地理位置；筛选取决于 match/exclude |
 | subscription-match | 空 | 可重复；大小写敏感字面子串 OR 匹配，空列表接受所有节点 |
 | subscription-exclude | 遊戲 | 可重复；任意非空关键词命中就排除；显式设置替代默认，可用空值关闭排除 |
@@ -43,7 +44,9 @@ Web 端口是示例，部署时保留已有端口。也保留已有 listen、规
 | subscription-timeout | 15 | 每条路径整次 GET 总超时秒数，包含代理握手、TLS、响应读取 |
 | subscription-max-bytes | 8388608 | 解压后响应大小上限；超过整份拒绝 |
 
-SSR 用 `group + 空格 + remarks` 匹配，SS 用片段名称匹配。关键词不拆分逗号、
+时间参数可使用 s/m/h/d/w（如 2h、1d），裸数字仍按秒；`checktolerance` 裸数字仍为毫秒。
+
+SSR 用 `group + 空格 + remarks` 匹配，其余协议用片段名称匹配。关键词不拆分逗号、
 不使用正则、不自动翻译、不按 IP 定位。多关键词请重复写字段。
 
 ### include 与覆盖规则（本版修正）
@@ -103,7 +106,7 @@ URL 编码的 name 按 query 原样解码；未编码的手写 name 仍兼容旧
 普通静态 forward 仍使用原格式。
 SS 插件、未知扩展、当前不支持的算法/SSR 协议或混淆明确计数并跳过。
 其他格式损坏的节点导致整个订阅拒绝，不接受其余半份节点。
-v0.22.0 发布版只转换 SS/SSR；当前开发测试版另见顶部协议适配说明。不导出 JSON。
+订阅转换支持 SS/SSR/AnyTLS/Trojan/VLESS，具体传输限制见顶部协议适配说明。不导出 JSON。
 
 启动先校验已有输出文件，再作为上次成功快照恢复，随后监听服务、后台刷新。
 生成文件首次不存在不报 include 错误；没有快照也没有静态节点时先拒绝转发，后台重试。
@@ -208,10 +211,12 @@ LHA history 新增 `lha-history-dir=/tmp/.glider-history`，下面仍按实例 I
 
 Base64 解码后和逐行明文输入均允许 UTF-8 BOM、空行、以 # / ; / // 开头的注释，
 以及 MAX=无符号十进制整数、STATUS=说明、REMARKS=说明 元信息行。这些行不是节点，不参加筛选。
-v0.22.0 发布版识别 VMess、VLESS、Trojan、Hysteria/Hysteria2/hy2、TUIC、WireGuard、Snell 分享链接，
-按不支持的协议明确计数跳过；该发布版不转换这些协议。开发测试版对 VLESS / Trojan / AnyTLS 的新增支持见顶部说明。SS/SSR 的顺序及重复项仍保留。
-未知文本、未知 scheme、非法 MAX 数字、损坏 SS/SSR 均继续整份拒绝，不接纳半份结果。
-仅含元信息或不支持协议而没有任何有效 SS/SSR 的输入也不会作为成功缓存或清空运行节点。
+v0.23.0 转换 SS、SSR、AnyTLS、Trojan 和受支持的 VLESS 配置；
+VMess、Hysteria/Hysteria2/hy2、TUIC、WireGuard、Snell 等已识别但不支持的分享链接明确计数跳过。
+支持节点的顺序及重复项保留。传输与参数限制见[协议适配说明](subscription-protocols.md)。
+未知文本、未知 scheme、非法 MAX 数字、损坏节点仍整体拒绝，不接纳半份结果。
+仅含元信息或不支持协议、没有有效受支持节点的输入，不作为有效节点缓存。
+协议或区域筛选后没有候选时，不覆盖当前节点与输出快照。
 
 -verbose 的 body 摘要新增 classes= 固定类别计数，包括 comment、metadata-max/status/remarks、
 unsupported-vmess 等；无法识别内容只标记 unknown-text 或 unknown-scheme，不输出实际文本或 scheme。

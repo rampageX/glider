@@ -6,24 +6,21 @@
 
 本仓库基于 [nadoo/glider](https://github.com/nadoo/glider) 与 [0xec/glider](https://github.com/0xec/glider) 维护，在保留 Glider 轻量设计的基础上，增加节点名称、LHA 运行状态与历史统计，以及原生订阅管理。
 
-## v0.22.0 更新亮点
+## v0.23.0 更新亮点
 
-**原生订阅、运行中更新节点、Web 页面查看订阅状态。**
+**五种订阅协议、REALITY + Vision，以及更方便的 LHA 测试和状态识别。**
 
-开发测试版新增 **AnyTLS / Trojan / VLESS（TLS / REALITY + Vision）订阅转换**。范围、构建方式和实机验证步骤见[协议适配说明](docs/subscription-protocols.md)。
+- **订阅转换扩展：** 支持 SS、SSR、AnyTLS、Trojan TCP/TLS、VLESS TCP（明文 / TLS / REALITY）；TLS / REALITY 可使用 Vision。无需转换网站或外挂 Xray 进程。
+- **协议筛选：** `subscription-protocol=anytls`、`trojan` 或 `vless` 可限定 LHA 候选；支持逗号分隔或重复配置多个协议，留空不限制。common 和实例配置均可使用，重复项取并集。
+- **时间后缀：** 间隔、超时和 TTL 可写 `1m`、`2h`、`1d`、`1w`，裸数字仍按秒。**`checktolerance` 裸数字仍为毫秒**，`1000` 与 `1s` 等价。
+- **状态页协议栏：** 从转发配置识别协议，代理链显示如 `TLS → WS → VLESS`，不依赖节点名称。
+- **沿用 0.22 的订阅能力：** 多订阅、区域筛选、原子输出与运行中更新、共享缓存、优先级下载路径、订阅状态和默认两小时失败重试。
 
-- **内置订阅管理：** 支持多个 SS/SSR 订阅，保留节点名称，使用可配置的字面关键词筛选区域，无需外部更新脚本。
-- **运行中更新：** 自动生成标准 `forward=` 节点文件，无需重启即可应用变化。定义未变的节点保留健康状态；所有订阅失败或候选列表为空时保留当前节点。部分失败时，仅使用成功的订阅输入。
-- **各订阅独立尝试下载路径：** 按顺序通过直连或代理执行 GET，支持跨进程共享缓存，以及缓存和输出文件的原子写入。
-- **订阅状态可见：** Status 页面显示订阅标题、脱敏 URL、各订阅成功/失败结果、检查/下载时间与下次刷新时间。
-- **谨慎重试：** 失败重试间隔独立设置，默认 **7200 秒（两小时）**，较短的正常刷新周期不会提前触发失败重试。
-- **可配置的存储与调试：** Linux 默认缓存目录为 `/tmp/.subscription-cache`，LHA 历史目录为 `/tmp/.glider-history`；启用 `-verbose` 可查看调试信息，不输出订阅 URL、token 或响应正文。
+用户已确认 **AnyTLS、Trojan、VLESS REALITY + Vision 实机连接可用**。速度、资源占用与长期稳定性仍需持续观察；其他构建架构未逐一实机验证。
 
-[下载 v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.22.0.md)
+[下载 v0.23.0](https://github.com/rampageX/glider/releases/tag/v0.23.0) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.23.0/glider_0.23.0_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.23.0.md)
 
-当前测试版同时支持时间后缀（如 `subscription-interval=2h`），并在状态页显示节点协议。`checktolerance` 裸数字仍按毫秒。
-
-## 原生 SS/SSR 订阅
+## 原生订阅（SS / SSR / AnyTLS / Trojan / VLESS）
 
 每个实例独立管理区域、节点输出文件及运行中的节点列表。多个实例可以通过公共配置共享订阅地址、下载设置和原始订阅缓存。
 
@@ -50,9 +47,9 @@ subscription-output=/var/lib/glider/nodes-asia.conf
 subscription-proxy=direct://#priority=100
 subscription-proxy=socks5h://127.0.0.1:1080#priority=90
 
-subscription-interval=3600
-subscription-cache-ttl=3600
-subscription-retry-interval=7200
+subscription-interval=1h
+subscription-cache-ttl=1h
+subscription-retry-interval=2h
 subscription-cache-dir=/tmp/.subscription-cache
 lha-history-dir=/tmp/.glider-history
 ```
@@ -63,8 +60,31 @@ lha-history-dir=/tmp/.glider-history
 - 下载路径复用 Glider 的 forwarder 语法：`#priority=` 数值越大越先尝试，同优先级按声明顺序。`direct://` 明确表示直连；`socks5h://` 由 SOCKS 服务器解析目标域名。
 - **正常刷新周期、缓存 TTL、失败重试间隔是三个独立设置。** 有效缓存可以直接复用，读取不会延长有效期；部分失败后重试时，成功输入的有效缓存仍可复用。
 - 启动时若存在上次成功生成的节点文件，先恢复服务，再后台刷新；首次安装即使没有旧节点文件，也能获取订阅并开始转发。
-- 筛选采用区分大小写的字面子串匹配：SS 匹配节点名，SSR 匹配 group + remarks。本开发测试版转换 SS/SSR、AnyTLS、Trojan 与受支持的 VLESS 配置；可识别但不支持的分享协议会统计并跳过。
+- 筛选采用区分大小写的字面子串匹配：SS 匹配节点名，SSR 匹配 group + remarks。本版转换 SS/SSR、AnyTLS、Trojan 与受支持的 VLESS 配置；可识别但不支持的分享协议会统计并跳过。
 - Linux 下可用 `systemctl kill -s HUP glider` 请求名为 `glider` 的服务手动刷新，仍遵守缓存 TTL。Status 页面的 **Refresh now** 按钮只刷新页面显示的数据。
+
+### 新参数与时间单位
+
+```ini
+# 只接纳订阅中的 VLESS；也可写 anytls,trojan，或重复配置
+subscription-protocol=vless
+# subscription-protocol=anytls,trojan
+
+checkinterval=1m
+checktimeout=3
+# 毫秒，与 1s 等价
+checktolerance=1000
+subscription-interval=2h
+subscription-cache-ttl=1d
+subscription-retry-interval=2h
+```
+
+时间单位：`s` 秒、`m` 分钟、`h` 小时、`d` 天（24 小时）、`w` 周（7 天），支持 `1h30m`。
+普通时间配置裸数字为秒；`checktolerance` 裸数字为毫秒且可用 `ms`。
+DHCP `LEASE_MINUTES` 裸数字仍为分钟，历史保留 `GLIDER_LHA_HISTORY_RETENTION_DAYS` 裸数字仍为天。
+主配置、common include、规则文件和命令行都支持时间后缀；数值必须符合原字段的精度，不能表示为整数秒的普通配置会报错。
+
+协议筛选与区域关键词同时生效，重启恢复快照时也会过滤。它**只限制订阅节点**，不影响手写 `forward=`、旧节点 include 或独立规则组；专门测协议时请移开这些额外节点和分流规则。修改配置后重启实例，普通订阅更新仍可自动应用。
 
 ### 从静态配置迁移与四实例部署
 
@@ -135,7 +155,7 @@ Web 页面已嵌入二进制文件，运行时无需单独部署网页文件或 
 
 ### LHA 历史存储
 
-历史按本地日期追加到 `YYYY-MM-DD.jsonl`。从 v0.22.0 起，Linux 默认基础目录为 `/tmp/.glider-history`，每个实例使用独立的 `glider-lha-history-<id>` 子目录。稳定实例 ID 由监听地址、Web/DNS 地址和服务设置生成。Windows 默认使用系统临时目录作为基础目录。
+历史按本地日期追加到 `YYYY-MM-DD.jsonl`。从 v0.23.0 起，Linux 默认基础目录为 `/tmp/.glider-history`，每个实例使用独立的 `glider-lha-history-<id>` 子目录。稳定实例 ID 由监听地址、Web/DNS 地址和服务设置生成。Windows 默认使用系统临时目录作为基础目录。
 
 若需要在临时目录清理或重启后保留历史，可指定持久化基础目录：
 
@@ -165,7 +185,7 @@ lha-history-dir=/var/lib/glider/history
 
 Glider 支持多种监听、转发、协议转换和代理链，包括 HTTP、SOCKS4/4A/5、Shadowsocks、Trojan、VLESS、VMess、SSH、TLS、WebSocket、KCP、Unix socket、UDP/TCP 隧道、AnyTLS 等底层项目支持的协议。
 
-**转发协议支持与订阅转换支持不同：v0.22.0 发布版仅转换 SS/SSR；本开发测试版新增的协议范围见[适配说明](docs/subscription-protocols.md)。**
+**转发协议支持与订阅转换支持不同：本版订阅转换支持 SS / SSR / AnyTLS / Trojan / VLESS 的指定配置。VMess、Hysteria2 等分享链接仍统计并跳过；WS / gRPC / XHTTP 等扩展限制见[协议与参数映射说明](docs/subscription-protocols.md)。**
 
 详细协议 URI 语法与配置示例见 [config/examples](config/examples)，也可运行：
 
@@ -177,10 +197,10 @@ glider -help
 
 ## 从源码构建
 
-Go 版本要求见 `go.mod`，建议使用当前稳定版工具链。
+Go 版本要求见 `go.mod`，建议使用当前稳定版工具链。**REALITY 需要 `with_utls` 构建标签**；仓库构建脚本和正式发行包已启用，不带标签的自编译版本不支持 REALITY。
 
 ```bash
-go build -trimpath -ldflags="-s -w" -o glider .
+go build -tags with_utls -trimpath -ldflags="-s -w" -o glider .
 ```
 
 Windows 下克隆仓库后，可以双击：
@@ -209,7 +229,7 @@ glider -verbose -config glider.conf client
 
 `name=` 仅为显示元数据。没有名称的旧 forwarder URL 继续有效，并使用地址作为显示名称。
 
-v0.20.x 与 v0.21.0 的 LHA 改动增加观测能力；v0.22.0 增加订阅节点的运行时更新，保留现有调度策略。普通静态单节点分组仍跳过健康检查；订阅管理的主分组即使只有一个节点也进行健康检查，以支持后续 1↔N 节点更新。历史存储失败不会阻止代理运行。
+v0.20.x 与 v0.21.0 的 LHA 改动增加观测能力；v0.23.0 增加订阅节点的运行时更新，保留现有调度策略。普通静态单节点分组仍跳过健康检查；订阅管理的主分组即使只有一个节点也进行健康检查，以支持后续 1↔N 节点更新。历史存储失败不会阻止代理运行。
 
 ## 更新记录
 

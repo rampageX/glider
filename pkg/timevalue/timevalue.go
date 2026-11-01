@@ -95,7 +95,13 @@ func (v *value) Set(raw string) error {
 }
 func Var(f *conflag.Conflag, p *int, name string, initial int, unit time.Duration, usage string) {
 	*p = initial
-	f.Var(&value{p, unit}, name, usage+"; suffixes: s/m/h/d/w")
+	bare := "seconds"
+	suffixes := "s/m/h/d/w"
+	if unit == time.Millisecond {
+		bare = "milliseconds"
+		suffixes = "ms/s/m/h/d/w"
+	}
+	f.Var(&value{p, unit}, name, usage+"; bare: "+bare+"; suffixes: "+suffixes)
 }
 func SecondsVar(f *conflag.Conflag, p *int, name string, initial int, usage string) {
 	Var(f, p, name, initial, time.Second, usage)

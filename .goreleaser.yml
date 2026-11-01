@@ -62,8 +62,10 @@ archives:
     files:
       - LICENSE
       - README.md
+      - README.en.md
       - CHANGELOG.md
       - docs/native-subscriptions.md
+      - docs/subscription-protocols.md
       - docs/releases/*.md
       - config/**/*
       - systemd/*
