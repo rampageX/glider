@@ -2,10 +2,10 @@ package ssh
 
 import (
 	"errors"
+	"github.com/nadoo/glider/pkg/timevalue"
 	"net"
 	"net/url"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -70,12 +70,15 @@ func NewSSH(s string, d proxy.Dialer, p proxy.Proxy) (*SSH, error) {
 	if qtimeout == "" {
 		qtimeout = "5" // default timeout
 	}
-	timeout, err := strconv.ParseUint(qtimeout, 10, 32)
-	if err != nil {
+	timeout, err := timevalue.Parse(qtimeout, time.Second)
+	if err != nil || timeout < 0 {
+		if err == nil {
+			err = errors.New("negative SSH timeout")
+		}
 		log.F("[ssh] parse timeout err: %s", err)
 		return nil, err
 	}
-	config.Timeout = time.Second * time.Duration(timeout)
+	config.Timeout = timeout
 
 	t := &SSH{
 		dialer: d,

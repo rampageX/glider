@@ -21,6 +21,8 @@ The development test build adds **AnyTLS, Trojan and VLESS (TLS / REALITY + Visi
 
 [Download v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.22.0.md)
 
+The test build also supports duration suffixes (for example `subscription-interval=2h`) and shows node protocols on Status. Bare `checktolerance` values remain milliseconds.
+
 ## Native SS/SSR subscriptions
 
 Each instance can manage its own region and output file. Multiple instances can share a common subscription configuration and raw cache while keeping their runtime node lists independent.

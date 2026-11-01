@@ -3,6 +3,7 @@ package subscription
 import (
 	"errors"
 	"github.com/nadoo/conflag"
+	"github.com/nadoo/glider/pkg/timevalue"
 	"os"
 	"path/filepath"
 	"time"
@@ -19,7 +20,7 @@ type Config struct {
 
 func RegisterFlags(f *conflag.Conflag, c *Config) {
 	f.StringSliceVar(&c.Titles, "subscription-title", nil, "optional subscription titles, one per subscription in the same order")
-	f.IntVar(&c.RetryInterval, "subscription-retry-interval", 7200, "retry failed refresh after seconds; 0 disables extra retries")
+	timevalue.SecondsVar(f, &c.RetryInterval, "subscription-retry-interval", 7200, "retry failed refresh after seconds; 0 disables extra retries")
 	f.StringSliceVar(&c.URLs, "subscription", nil, "subscription URL (repeatable)")
 	f.StringSliceVar(&c.Protocols, "subscription-protocol", nil, "allowed subscription protocols: ss, ssr, anytls, trojan, vless (repeatable or comma-separated; empty allows all)")
 	f.StringSliceVar(&c.Matches, "subscription-match", nil, "literal case-sensitive include keyword (OR)")
@@ -28,10 +29,10 @@ func RegisterFlags(f *conflag.Conflag, c *Config) {
 	f.StringVar(&c.Region, "subscription-region", "", "instance region label")
 	f.StringVar(&c.Output, "subscription-output", "", "managed forward file; DO NOT include it")
 	f.StringVar(&c.CacheDir, "subscription-cache-dir", filepath.Join(os.TempDir(), ".subscription-cache"), "shared raw subscription cache directory")
-	f.IntVar(&c.Interval, "subscription-interval", 3600, "refresh interval seconds, independent of cache TTL")
-	f.IntVar(&c.TTL, "subscription-cache-ttl", 3600, "raw cache validity seconds")
-	f.IntVar(&c.ConnectTimeout, "subscription-connect-timeout", 3, "download connection/handshake timeout seconds")
-	f.IntVar(&c.Timeout, "subscription-timeout", 15, "total timeout per GET route seconds")
+	timevalue.SecondsVar(f, &c.Interval, "subscription-interval", 3600, "refresh interval seconds, independent of cache TTL")
+	timevalue.SecondsVar(f, &c.TTL, "subscription-cache-ttl", 3600, "raw cache validity seconds")
+	timevalue.SecondsVar(f, &c.ConnectTimeout, "subscription-connect-timeout", 3, "download connection/handshake timeout seconds")
+	timevalue.SecondsVar(f, &c.Timeout, "subscription-timeout", 15, "total timeout per GET route seconds")
 	f.IntVar(&c.MaxBytes, "subscription-max-bytes", 8<<20, "maximum response bytes")
 }
 func (c *Config) Resolve(dir string) error {

@@ -152,12 +152,13 @@
         const rows=forwarders.map(f=>`<tr class="${f.current?'current-row':''}">
           <td>${escapeHtml(f.status)}</td>
           <td><div class="node-name">${escapeHtml(f.name||f.addr)}${f.current?'<span class="current-pill">CURRENT</span>':''}</div>${f.name&&f.name!==f.addr?`<div class="node-addr">${escapeHtml(f.addr)}</div>`:''}</td>
+          <td>${escapeHtml(f.protocol||'—')}</td>
           <td>${f.priority}</td><td>${f.failures}</td><td>${f.latency_ms}</td>
         </tr>`).join('');
         return `<section class="panel group">
           <div class="group-head"><div><h2 class="group-name">${escapeHtml(group.name||'main')}</h2><div class="meta"><span>Strategy: ${escapeHtml(group.strategy||'rr')}</span><span>Priority: ${group.priority}</span><span>Enabled: ${group.enabled_count}/${group.total_count}</span></div></div><span class="badge ${badgeClass}">${group.status}</span></div>
           ${currentBox}
-          <div class="table-wrap"><table><thead><tr><th>Status</th><th>Forwarder</th><th>Priority</th><th>Failures</th><th>Latency ms</th></tr></thead><tbody>${rows}</tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Status</th><th>Forwarder</th><th>协议</th><th>Priority</th><th>Failures</th><th>Latency ms</th></tr></thead><tbody>${rows}</tbody></table></div>
         </section>`;
       }).join('');
     }

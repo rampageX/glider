@@ -156,3 +156,27 @@ func (f *Forwarder) MaxFailures() uint32     { return atomic.LoadUint32(&f.maxFa
 func (f *Forwarder) SetMaxFailures(l uint32) { atomic.StoreUint32(&f.maxFailures, l) }
 func (f *Forwarder) Latency() int64          { return atomic.LoadInt64(&f.latency) }
 func (f *Forwarder) SetLatency(l int64)      { atomic.StoreInt64(&f.latency, l) }
+
+// Protocol is derived from schemes, never from the display name or credentials.
+// Preserve chain order so TLS/WS transports remain visible alongside VLESS etc.
+func (f *Forwarder) Protocol() string {
+	core, _, _ := strings.Cut(f.url, "#")
+	var protocols []string
+	for _, part := range strings.Split(core, ",") {
+		scheme, _, ok := strings.Cut(part, "://")
+		if !ok {
+			return "UNKNOWN"
+		}
+		scheme = strings.ToLower(scheme)
+		switch scheme {
+		case "ss", "ssr", "anytls", "anytlsc", "trojan", "trojanc", "vless", "vmess", "tls", "ws", "wss", "http", "https", "socks4", "socks4a", "socks5", "socks5h", "ssh", "kcp", "smux", "tcp", "udp", "direct", "reject", "unix", "vsock", "pxyproto", "obfs", "simple-obfs":
+			protocols = append(protocols, strings.ToUpper(scheme))
+		default:
+			protocols = append(protocols, "UNKNOWN")
+		}
+	}
+	if len(protocols) == 0 {
+		return "UNKNOWN"
+	}
+	return strings.Join(protocols, " → ")
+}

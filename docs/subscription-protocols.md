@@ -20,6 +20,22 @@
 Trojan / AnyTLS 暂不转换 WebSocket、gRPC、自定义 ALPN 等扩展。
 VLESS 暂不转换 WS、gRPC、XHTTP、非 none encryption、其他 flow。
 
+## 时间单位与状态页协议栏
+
+间隔、超时、DNS TTL、订阅刷新/重试/缓存 TTL 支持 `s`、`m`、`h`、`d`、`w`；
+裸数字继续按秒。例如 `subscription-interval=2h`、`subscription-cache-ttl=1d`、
+`subscription-retry-interval=2h`、`checkinterval=1m`。主配置、common include、
+规则文件与命令行均可使用。`d` 固定为 24 小时，`w` 为 7 天。
+复合值如 `1h30m` 也支持，不能转换为整数秒的值会报错，不会静默截断。
+
+**旧含义保持：** `checktolerance` 裸数字为毫秒，`checktolerance=1000` 与 `1s` 等价，
+也可以写 `500ms`。DHCP 的 `LEASE_MINUTES` 裸数字仍为分钟；
+`GLIDER_LHA_HISTORY_RETENTION_DAYS` 裸数字仍为天，后缀须能转换为整数天。
+AnyTLS URL 中的三项超时/空闲间隔与 SSH `timeout` 也支持后缀，裸数字按秒。
+
+状态页节点表新增“协议”栏，直接读取转发配置的 scheme，不根据节点名字猜测。
+链式转发显示例如 `TLS → WS → VLESS`；不显示账号密码等 URL 字段。
+
 ## 按协议测试 LHA
 
 在实例主配置加入可选协议白名单（留空/不配置表示不限制）：
@@ -99,7 +115,8 @@ Vision 客户端代码在 `proxy/vless/internal/vision` 保留带许可证的兼
   数据传输通过，错误 short ID 被拒绝；Vision XUDP 本地回显通过。
 - 可选独立互通测试：设置 `GLIDER_XRAY_TEST_BINARY` 为 Xray 可执行文件路径；
   测试仅在回环地址启动临时服务，不会使用真实订阅或访问机场。
-- N1 上实际机场连通性、吞吐、内存占用及长期连接稳定性仍待实机确认。
+- 用户实机已确认 AnyTLS / Trojan / VLESS 三协议的订阅解析和配置生成正常。
+- 因外线受阻，N1 上实际机场连接、吞吐、内存占用及长期连接稳定性仍待实机确认。
 
 ## N1 最小测试
 

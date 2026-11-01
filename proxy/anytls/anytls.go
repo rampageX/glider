@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/nadoo/glider/pkg/timevalue"
 	"github.com/nadoo/glider/proxy"
 )
 
@@ -66,17 +67,17 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 	}
 
 	a := &AnyTLS{
-		dialer:                    d,
-		proxy:                     p,
-		addr:                      u.Host,
-		password:                  password,
-		withTLS:                   true,
-		serverName:                serverName,
-		skipVerify:                skipVerify,
-		certFile:                  query.Get("cert"),
-		keyFile:                   query.Get("key"),
-		fallback:                  query.Get("fallback"),
-		synackTimeout:             10 * time.Second,
+		dialer:                   d,
+		proxy:                    p,
+		addr:                     u.Host,
+		password:                 password,
+		withTLS:                  true,
+		serverName:               serverName,
+		skipVerify:               skipVerify,
+		certFile:                 query.Get("cert"),
+		keyFile:                  query.Get("key"),
+		fallback:                 query.Get("fallback"),
+		synackTimeout:            10 * time.Second,
 		idleSessionCheckInterval: defaultIdleSessionCheckInterval,
 		idleSessionTimeout:       defaultIdleSessionTimeout,
 		minIdleSession:           defaultMinIdleSession,
@@ -99,21 +100,21 @@ func NewAnyTLS(s string, d proxy.Dialer, p proxy.Proxy) (*AnyTLS, error) {
 	}
 
 	if timeout := query.Get("synackTimeout"); timeout != "" {
-		d, err := time.ParseDuration(timeout)
+		d, err := timevalue.Parse(timeout, time.Second)
 		if err != nil {
 			return nil, fmt.Errorf("[anytls] invalid synackTimeout: %s", err)
 		}
 		a.synackTimeout = d
 	}
 	if value := query.Get("idleSessionCheckInterval"); value != "" {
-		d, err := time.ParseDuration(value)
+		d, err := timevalue.Parse(value, time.Second)
 		if err != nil {
 			return nil, fmt.Errorf("[anytls] invalid idleSessionCheckInterval: %s", err)
 		}
 		a.idleSessionCheckInterval = d
 	}
 	if value := query.Get("idleSessionTimeout"); value != "" {
-		d, err := time.ParseDuration(value)
+		d, err := timevalue.Parse(value, time.Second)
 		if err != nil {
 			return nil, fmt.Errorf("[anytls] invalid idleSessionTimeout: %s", err)
 		}

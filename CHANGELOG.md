@@ -4,6 +4,9 @@ All notable changes in this fork are documented here.
 
 ## [Unreleased]
 
+- Accept s/m/h/d/w time suffixes for interval, timeout and TTL settings, including common/rule configs, while preserving bare-number milliseconds for checktolerance and explicit legacy minute/day fields.
+- Show each forwarder's protocol (and transport chains) in the Status page and API.
+
 - Add optional `subscription-protocol` allowlist for LHA protocol testing; apply it to refreshes, matched-node status counts and restored snapshots without changing shared raw caches.
 
 - Import AnyTLS, TCP/TLS Trojan and supported TCP VLESS subscription URIs, preserving names and normalizing SNI/verification aliases without transport downgrade.

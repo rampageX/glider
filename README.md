@@ -21,6 +21,8 @@
 
 [下载 v0.22.0](https://github.com/rampageX/glider/releases/tag/v0.22.0) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.22.0/glider_0.22.0_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.22.0.md)
 
+当前测试版同时支持时间后缀（如 `subscription-interval=2h`），并在状态页显示节点协议。`checktolerance` 裸数字仍按毫秒。
+
 ## 原生 SS/SSR 订阅
 
 每个实例独立管理区域、节点输出文件及运行中的节点列表。多个实例可以通过公共配置共享订阅地址、下载设置和原始订阅缓存。

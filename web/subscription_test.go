@@ -24,7 +24,7 @@ func TestStatusIncludesSubscriptionsAndStaticMode(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
 		out := httptest.NewRecorder()
 		router.ServeHTTP(out, req)
-		if out.Code != 200 || out.Header().Get("Cache-Control") != "no-store" || !strings.Contains(out.Body.String(), `"subscriptions"`) {
+		if out.Code != 200 || out.Header().Get("Cache-Control") != "no-store" || (!strings.Contains(out.Body.String(), `"subscriptions"`) || !strings.Contains(out.Body.String(), `"protocol":"DIRECT"`)) {
 			t.Fatal(out.Body.String())
 		}
 		if s.subscriptions != nil && !strings.Contains(out.Body.String(), "订阅一") {

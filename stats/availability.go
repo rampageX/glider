@@ -5,21 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nadoo/glider/pkg/timevalue"
 	"log"
 	"math"
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	AvailabilityBucketMinutes            = 15
-	DefaultAvailabilityRetentionDays     = 30
-	availabilityRetentionEnv             = "GLIDER_LHA_HISTORY_RETENTION_DAYS"
+	AvailabilityBucketMinutes        = 15
+	DefaultAvailabilityRetentionDays = 30
+	availabilityRetentionEnv         = "GLIDER_LHA_HISTORY_RETENTION_DAYS"
 )
 
 // AvailabilitySample stores the result of one LHA forwarder health check.
@@ -60,10 +60,10 @@ type AvailabilityNodeDay struct {
 }
 
 type AvailabilityGroupDay struct {
-	Name         string               `json:"name"`
-	Checks       int                  `json:"checks"`
-	Available    int                  `json:"available_windows"`
-	Availability float64              `json:"availability"`
+	Name         string                `json:"name"`
+	Checks       int                   `json:"checks"`
+	Available    int                   `json:"available_windows"`
+	Availability float64               `json:"availability"`
 	Nodes        []AvailabilityNodeDay `json:"nodes"`
 }
 
@@ -444,7 +444,7 @@ func InitAvailabilityStore(defaultDirectory, instanceID string) error {
 	}
 	retentionDays := DefaultAvailabilityRetentionDays
 	if raw := strings.TrimSpace(os.Getenv(availabilityRetentionEnv)); raw != "" {
-		days, err := strconv.Atoi(raw)
+		days, err := timevalue.Int(raw, 24*time.Hour)
 		if err != nil || days < 0 {
 			log.Printf("[lha-history] invalid %s value %q; using the default of %d days", availabilityRetentionEnv, raw, DefaultAvailabilityRetentionDays)
 		} else {

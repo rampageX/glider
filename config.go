@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path"
- "path/filepath"
+	"path/filepath"
 
 	"github.com/nadoo/conflag"
+	"github.com/nadoo/glider/pkg/timevalue"
 
 	"github.com/nadoo/glider/dns"
 	"github.com/nadoo/glider/pkg/configfile"
@@ -33,10 +34,10 @@ type Config struct {
 	RuleFiles []string
 	RulesDir  string
 
-	DNS       string
-	DNSConfig dns.Config
-	Web       string
- HistoryDir string
+	DNS        string
+	DNSConfig  dns.Config
+	Web        string
+	HistoryDir string
 
 	rules []*rule.Config
 
@@ -69,14 +70,14 @@ check=http://HOST[:PORT][/URI][#expect=REGEX_MATCH_IN_RESP_LINE]
 check=https://HOST[:PORT][/URI][#expect=REGEX_MATCH_IN_RESP_LINE]
 check=file://SCRIPT_PATH: run a check script, healthy when exitcode=0, env vars: FORWARDER_ADDR,FORWARDER_URL
 check=disable: disable health check`)
-	flag.IntVar(&conf.Strategy.CheckInterval, "checkinterval", 30, "fowarder check interval(seconds)")
-	flag.IntVar(&conf.Strategy.CheckTimeout, "checktimeout", 10, "fowarder check timeout(seconds)")
-	flag.IntVar(&conf.Strategy.CheckTolerance, "checktolerance", 0, "fowarder check tolerance(ms), switch only when new_latency < old_latency - tolerance, only used in lha mode")
+	timevalue.SecondsVar(flag, &conf.Strategy.CheckInterval, "checkinterval", 30, "fowarder check interval(seconds)")
+	timevalue.SecondsVar(flag, &conf.Strategy.CheckTimeout, "checktimeout", 10, "fowarder check timeout(seconds)")
+	timevalue.MillisecondsVar(flag, &conf.Strategy.CheckTolerance, "checktolerance", 0, "fowarder check tolerance(ms), switch only when new_latency < old_latency - tolerance, only used in lha mode")
 	flag.IntVar(&conf.Strategy.CheckLatencySamples, "checklatencysamples", 10, "use the average latency of the latest N checks")
 	flag.BoolVar(&conf.Strategy.CheckDisabledOnly, "checkdisabledonly", false, "check disabled fowarders only")
 	flag.IntVar(&conf.Strategy.MaxFailures, "maxfailures", 3, "max failures to change forwarder status to disabled")
-	flag.IntVar(&conf.Strategy.DialTimeout, "dialtimeout", 3, "dial timeout(seconds)")
-	flag.IntVar(&conf.Strategy.RelayTimeout, "relaytimeout", 0, "relay timeout(seconds)")
+	timevalue.SecondsVar(flag, &conf.Strategy.DialTimeout, "dialtimeout", 3, "dial timeout(seconds)")
+	timevalue.SecondsVar(flag, &conf.Strategy.RelayTimeout, "relaytimeout", 0, "relay timeout(seconds)")
 	flag.StringVar(&conf.Strategy.IntFace, "interface", "", "source ip or source interface")
 
 	flag.StringSliceUniqVar(&conf.RuleFiles, "rulefile", nil, "rule file path")
@@ -86,15 +87,15 @@ check=disable: disable health check`)
 	flag.StringVar(&conf.DNS, "dns", "", "local dns server listen address")
 	flag.StringSliceUniqVar(&conf.DNSConfig.Servers, "dnsserver", []string{"8.8.8.8:53"}, "remote dns server address")
 	flag.BoolVar(&conf.DNSConfig.AlwaysTCP, "dnsalwaystcp", false, "always use tcp to query upstream dns servers no matter there is a forwarder or not")
-	flag.IntVar(&conf.DNSConfig.Timeout, "dnstimeout", 3, "timeout value used in multiple dnsservers switch(seconds)")
-	flag.IntVar(&conf.DNSConfig.MaxTTL, "dnsmaxttl", 1800, "maximum TTL value for entries in the CACHE(seconds)")
-	flag.IntVar(&conf.DNSConfig.MinTTL, "dnsminttl", 0, "minimum TTL value for entries in the CACHE(seconds)")
+	timevalue.SecondsVar(flag, &conf.DNSConfig.Timeout, "dnstimeout", 3, "timeout value used in multiple dnsservers switch(seconds)")
+	timevalue.SecondsVar(flag, &conf.DNSConfig.MaxTTL, "dnsmaxttl", 1800, "maximum TTL value for entries in the CACHE(seconds)")
+	timevalue.SecondsVar(flag, &conf.DNSConfig.MinTTL, "dnsminttl", 0, "minimum TTL value for entries in the CACHE(seconds)")
 	flag.IntVar(&conf.DNSConfig.CacheSize, "dnscachesize", 4096, "max number of dns response in CACHE")
 	flag.BoolVar(&conf.DNSConfig.CacheLog, "dnscachelog", false, "show query log of dns cache")
 	flag.BoolVar(&conf.DNSConfig.NoAAAA, "dnsnoaaaa", false, "disable AAAA query")
 	flag.StringSliceUniqVar(&conf.DNSConfig.Records, "dnsrecord", nil, "custom dns record, format: domain/ip")
-	flag.StringVar(&conf.HistoryDir,"lha-history-dir",filepath.Join(os.TempDir(),".glider-history"),"LHA history base directory (instance subdirectories; relative to main config)")
- flag.StringVar(&conf.Web, "web", ":8888", "web admin listen address")
+	flag.StringVar(&conf.HistoryDir, "lha-history-dir", filepath.Join(os.TempDir(), ".glider-history"), "LHA history base directory (instance subdirectories; relative to main config)")
+	flag.StringVar(&conf.Web, "web", ":8888", "web admin listen address")
 
 	// service configs
 	flag.StringSliceUniqVar(&conf.Services, "service", nil, "run specified services, format: SERVICE_NAME[,SERVICE_CONFIG]")
@@ -139,8 +140,10 @@ check=disable: disable health check`)
 	if err := conf.Subscription.Resolve(flag.ConfDir()); err != nil {
 		log.Fatal(err)
 	}
-	if !filepath.IsAbs(conf.HistoryDir) { conf.HistoryDir=filepath.Join(flag.ConfDir(),conf.HistoryDir) }
- loadRules(conf)
+	if !filepath.IsAbs(conf.HistoryDir) {
+		conf.HistoryDir = filepath.Join(flag.ConfDir(), conf.HistoryDir)
+	}
+	loadRules(conf)
 	return conf
 }
 

@@ -6,9 +6,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/nadoo/glider/pkg/timevalue"
 	"net"
 	"net/netip"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -65,10 +65,10 @@ func New(failover bool, args ...string) (*dhcpd, error) {
 	}
 
 	var lease = time.Hour * 12
-	if i, err := strconv.Atoi(leaseMin); err == nil {
-		lease = time.Duration(i) * time.Minute
+	if parsed, err := timevalue.Parse(leaseMin, time.Minute); err == nil {
+		lease = parsed
 	} else {
-		return nil, fmt.Errorf("LEASE_MINUTES %s is not valid: %s", end, err)
+		return nil, fmt.Errorf("LEASE_MINUTES is not a valid duration")
 	}
 
 	pool, err := NewPool(lease, startIP, endIP)
