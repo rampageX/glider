@@ -1,6 +1,7 @@
 package subscription
 
 import (
+	"encoding/base64"
 	"net/url"
 	"strings"
 	"testing"
@@ -33,6 +34,41 @@ func TestModernMapping(t *testing.T) {
 			if err := Validate([]string{n.Forward}); err != nil {
 				t.Fatal(err)
 			}
+		}
+	}
+}
+func TestV2rayNTCPDefaultsAndSingleLineEnvelope(t *testing.T) {
+	// v2rayN includes these unused TCP fields in some REALITY/Vision exports.
+	// The TLS fixture exercises the same normalization without requiring utls.
+	link := "vless://707f20ea-d4b8-4d1d-8e2e-2c86cb2ed97a@example.test:443?type=tcp&encryption=none&security=tls&flow=xtls-rprx-vision&headerType=none&host=&path=#Example"
+	lines := make([]string, 0, 44)
+	for i := 0; i < 34; i++ {
+		lines = append(lines, link)
+	}
+	for i := 0; i < 10; i++ {
+		lines = append(lines, "hysteria2://unsupported@example.test:443")
+	}
+	text := base64.RawStdEncoding.EncodeToString([]byte(strings.Join(lines, "\n")))
+	nodes, skipped, err := Parse([]byte(text))
+	if err != nil || len(nodes) != 34 || skipped != 10 {
+		t.Fatalf("v2rayN envelope nodes=%d skipped=%d err=%v", len(nodes), skipped, err)
+	}
+	if err := Validate([]string{nodes[0].Forward}); err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(strings.SplitN(nodes[0].Forward, "#", 2)[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"headerType", "host", "path"} {
+		if _, exists := u.Query()[key]; exists {
+			t.Fatalf("inert %s leaked into canonical forwarder", key)
+		}
+	}
+	for _, change := range [][2]string{{"headerType=none", "headerType=http"}, {"host=", "host=example.test"}, {"path=", "path=%2Ftest"}, {"type=tcp", "type=ws"}} {
+		bad := strings.Replace(link, change[0], change[1], 1)
+		if n, s, e := Parse([]byte(bad)); e == nil || n != nil || s != 1 {
+			t.Fatalf("unsafe transport extension %s accepted: nodes=%d skipped=%d err=%v", change[1], len(n), s, e)
 		}
 	}
 }

@@ -52,7 +52,7 @@ func parseModern(raw string) (Node, error) {
 		allowed[k] = true
 	}
 	if u.Scheme == "vless" {
-		for _, k := range strings.Fields("encryption flow fp pbk sid spx mode") {
+		for _, k := range strings.Fields("encryption flow fp pbk sid spx mode headerType host path") {
 			allowed[k] = true
 		}
 	} else if u.Scheme == "trojan" {
@@ -68,6 +68,14 @@ func parseModern(raw string) (Node, error) {
 	}
 	if t := q.Get("type"); t != "" && t != "tcp" && t != "raw" {
 		return Node{}, errUnsupported
+	}
+	if u.Scheme == "vless" {
+		// v2rayN exports these legacy TCP fields even for REALITY + Vision.
+		// Accept only their inert defaults; non-default values must not be
+		// silently dropped and change the intended transport semantics.
+		if (q.Get("headerType") != "" && q.Get("headerType") != "none") || q.Get("host") != "" || q.Get("path") != "" {
+			return Node{}, errUnsupported
+		}
 	}
 	security := q.Get("security")
 	if u.Scheme != "vless" && security != "" && security != "tls" {

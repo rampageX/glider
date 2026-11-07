@@ -41,19 +41,19 @@ func TestInputStatusCacheFailureAndSafeURL(t *testing.T) {
 	}
 	m.Refresh(context.Background())
 	first := m.Snapshot().Inputs[0]
-	if first.Result != "SUCCESS" || first.Source != "download" || first.LastSuccessAt == nil || first.CheckedAt == nil || first.MatchedNodes != 1 {
+	if first.Result != resultSuccess || first.Source != "download" || first.LastSuccessAt == nil || first.LastDownloadAt == nil || first.HTTPStatus != 200 || first.CheckedAt == nil || first.MatchedNodes != 1 {
 		t.Fatal(first)
 	}
 	m.Refresh(context.Background())
 	cached := m.Snapshot().Inputs[0]
-	if hits.Load() != 1 || cached.Source != "cache" || !first.LastSuccessAt.Equal(*cached.LastSuccessAt) {
+	if hits.Load() != 1 || cached.Source != "cache" || cached.HTTPStatus != 0 || !first.LastSuccessAt.Equal(*cached.LastSuccessAt) || !first.LastDownloadAt.Equal(*cached.LastDownloadAt) {
 		t.Fatal("cache masquerades as new download")
 	}
 	fail.Store(true)
 	m.conf.TTL = 0
 	m.Refresh(context.Background())
 	failed := m.Snapshot()
-	if failed.Inputs[0].Result != "FAILED" || !failed.Inputs[0].LastSuccessAt.Equal(*first.LastSuccessAt) || m.nextDelay() != 2*time.Hour {
+	if failed.Inputs[0].Result != resultDownloadFailed || failed.Inputs[0].HTTPStatus != 503 || !failed.Inputs[0].LastSuccessAt.Equal(*first.LastSuccessAt) || !failed.Inputs[0].LastDownloadAt.Equal(*first.LastDownloadAt) || m.nextDelay() != 2*time.Hour {
 		t.Fatal(failed)
 	}
 	if failed.ApplyResult != "RETAINED_NO_INPUT" {
@@ -62,9 +62,45 @@ func TestInputStatusCacheFailureAndSafeURL(t *testing.T) {
 	// Returned snapshots must not expose mutable backing arrays or timestamps.
 	failed.Inputs[0].Title = "changed"
 	*failed.Inputs[0].LastSuccessAt = time.Time{}
+	*failed.Inputs[0].LastDownloadAt = time.Time{}
 	actual := m.Snapshot().Inputs[0]
-	if actual.Title != "我的订阅" || actual.LastSuccessAt.IsZero() {
+	if actual.Title != "我的订阅" || actual.LastSuccessAt.IsZero() || actual.LastDownloadAt.IsZero() {
 		t.Fatal("snapshot aliases live state")
+	}
+}
+func TestSubscriptionStageResultsAndLastDownload(t *testing.T) {
+	var body atomic.Value
+	body.Store("malformed provider response")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, body.Load().(string))
+	}))
+	defer server.Close()
+	c := testConfig(t.TempDir(), server.URL)
+	c.TTL = 0
+	c.Matches = []string{"日本"}
+	m := manager(t, c)
+	m.Refresh(context.Background())
+	malformed := m.Snapshot().Inputs[0]
+	if malformed.Result != resultParseFailed || malformed.HTTPStatus != 200 || malformed.LastDownloadAt == nil || malformed.LastSuccessAt != nil {
+		t.Fatal(malformed)
+	}
+	body.Store("hysteria2://password@example.test:443")
+	m.Refresh(context.Background())
+	unsupported := m.Snapshot().Inputs[0]
+	if unsupported.Result != resultNoUsableNodes || unsupported.SkippedNodes != 1 || unsupported.HTTPStatus != 200 || unsupported.LastSuccessAt != nil {
+		t.Fatal(unsupported)
+	}
+	body.Store(ss("美国"))
+	m.Refresh(context.Background())
+	filtered := m.Snapshot().Inputs[0]
+	if filtered.Result != resultNoUsableNodes || filtered.MatchedNodes != 0 || filtered.LastSuccessAt == nil || filtered.Source != "download" {
+		t.Fatal(filtered)
+	}
+	m.conf.Matches = []string{"美国"}
+	m.Refresh(context.Background())
+	good := m.Snapshot().Inputs[0]
+	if good.Result != resultSuccess || good.MatchedNodes != 1 || good.LastDownloadAt == nil {
+		t.Fatal(good)
 	}
 }
 func TestRetryRunCancellationAndNoConcurrentRefresh(t *testing.T) {
@@ -88,7 +124,7 @@ func TestRetryRunCancellationAndNoConcurrentRefresh(t *testing.T) {
 	sawRetry := false
 	for time.Now().Before(deadline) {
 		s := m.Snapshot()
-		if s.NextRefreshAt != nil && s.Inputs[0].Result == "FAILED" {
+		if s.NextRefreshAt != nil && s.Inputs[0].Result == resultDownloadFailed {
 			sawRetry = true
 		}
 		if hits.Load() >= 2 && !s.Refreshing && s.Inputs[0].Result == "SUCCESS" {
@@ -151,7 +187,7 @@ func TestStatusNonblockingDuringDownloadAndPartialCacheReuse(t *testing.T) {
 	// Subsequent partial-failure retry reuses the good input's valid cache.
 	m.Refresh(context.Background())
 	s := m.Snapshot()
-	if hits.Load() != 1 || s.Inputs[0].Source != "cache" || s.Inputs[1].Result != "FAILED" || m.nextDelay() != 2*time.Hour {
+	if hits.Load() != 1 || s.Inputs[0].Source != "cache" || s.Inputs[1].Result != resultDownloadFailed || m.nextDelay() != 2*time.Hour {
 		t.Fatal(s)
 	}
 }

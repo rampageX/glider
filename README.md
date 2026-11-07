@@ -6,7 +6,15 @@
 
 本仓库基于 [nadoo/glider](https://github.com/nadoo/glider) 与 [0xec/glider](https://github.com/0xec/glider) 维护，在保留 Glider 轻量设计的基础上，增加节点名称、LHA 运行状态与历史统计，以及原生订阅管理。
 
-## v0.23.0 更新亮点
+## v0.23.1 更新亮点
+
+- **修复 v2rayN VLESS TCP 订阅导入：** 接受多余但无作用的 `headerType=none`、空 `host` / `path` 参数，非默认传输扩展仍严格拒绝。
+- **订阅状态更准确：** 区分下载失败、解析失败、无可用节点和处理失败；显示 HTTP 状态、最近完整下载时间、上次成功解析时间，不再把解析失败误报成“下载失败”。
+- **真实订阅验证：** 一份单行 Base64 混合订阅成功解析 34 个 VLESS、跳过 10 个 Hysteria2；N1 状态页面已确认区域筛选后匹配 29 个节点。此处仅验证导入与配置，未将所有线路标记为连通。
+
+[下载 v0.23.1](https://github.com/rampageX/glider/releases/tag/v0.23.1) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.23.1/glider_0.23.1_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.23.1.md)
+
+## v0.23.0 主要功能
 
 **五种订阅协议、REALITY + Vision，以及更方便的 LHA 测试和状态识别。**
 
@@ -18,7 +26,7 @@
 
 用户已确认 **AnyTLS、Trojan、VLESS REALITY + Vision 实机连接可用**。速度、资源占用与长期稳定性仍需持续观察；其他构建架构未逐一实机验证。
 
-[下载 v0.23.0](https://github.com/rampageX/glider/releases/tag/v0.23.0) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.23.0/glider_0.23.0_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.23.0.md)
+[v0.23.0 完整说明](docs/releases/v0.23.0.md)
 
 ## 原生订阅（SS / SSR / AnyTLS / Trojan / VLESS）
 

@@ -1,4 +1,4 @@
-# 协议与订阅转换适配（v0.23.0）
+# 协议与订阅转换适配（v0.23.x）
 
 本版沿用 0.22 的订阅配置、更新周期、失败重试、缓存和 Web Status 页面。
 不需要转换网站或额外代理内核进程。REALITY / Vision 在 Glider 进程内运行。
@@ -79,6 +79,7 @@ VLESS 选择包含其受支持的各种传输；它不是只选 REALITY / Vision
 | VLESS `fp` | chrome（默认）、firefox、safari、edge、ios |
 | VLESS `alpn` | 逗号分隔的 ALPN 值 |
 | VLESS TCP `mode` | 部分导出器多余的 XHTTP 字段；TCP 下不使用 |
+| VLESS TCP `headerType=none`、空 `host=` / `path=` | 兼容 v2rayN 默认导出字段，转换时去掉；非默认值仍拒绝，不降级传输 |
 | VLESS `spx` | 保留兼容字段；本实现认证失败即关闭，不执行爬虫回退 |
 
 Trojan 指纹匹配叶证书时接受该指纹；匹配 CA 时还会校验证书链及 serverName。

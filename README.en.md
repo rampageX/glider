@@ -6,7 +6,15 @@ A compact multi-protocol forward proxy with flexible proxy chains, rule-based ro
 
 This repository is a maintained fork derived from [nadoo/glider](https://github.com/nadoo/glider) and [0xec/glider](https://github.com/0xec/glider). It keeps glider's lightweight design while adding practical observability for latency-based high availability (LHA) operation.
 
-## v0.23.0 highlights
+## v0.23.1 highlights
+
+- **v2rayN VLESS TCP import:** Accept inert exporter defaults (`headerType=none`, empty `host` / `path`) while still rejecting non-default transports and extensions.
+- **Clearer subscription outcomes:** Distinguish download, parse, no-usable-node, and local processing failures; show the HTTP response status, last complete download, and last successful parse timestamps.
+- **Real subscription verification:** A single-line Base64 subscription produced 34 supported VLESS nodes and 10 explicitly skipped Hysteria2 nodes; the user's N1 status page confirmed 29 nodes after region filtering. Actual connectivity of every node is not asserted.
+
+[Download v0.23.1](https://github.com/rampageX/glider/releases/tag/v0.23.1) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.23.1/glider_0.23.1_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.23.1.md)
+
+## v0.23.0 major features
 
 **Five subscription protocols, in-process REALITY + Vision, and clearer LHA testing/status.**
 
@@ -18,7 +26,7 @@ This repository is a maintained fork derived from [nadoo/glider](https://github.
 
 The user confirmed real-device connectivity for **AnyTLS, Trojan and VLESS REALITY + Vision**. Throughput and long-running stability remain under observation; other build architectures have not all been device-tested.
 
-[Download v0.23.0](https://github.com/rampageX/glider/releases/tag/v0.23.0) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.23.0/glider_0.23.0_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.23.0.md)
+[Full v0.23.0 notes](docs/releases/v0.23.0.md)
 
 ## Native subscriptions (SS / SSR / AnyTLS / Trojan / VLESS)
 

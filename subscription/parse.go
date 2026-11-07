@@ -17,6 +17,7 @@ import (
 type Node struct{ Forward, Name, Group string }
 
 var errUnsupported = errors.New("unsupported node")
+var errNoSupportedNodes = errors.New("no supported nodes")
 
 func decode(s string) (string, error) {
 	s = strings.TrimSpace(s)
@@ -72,7 +73,7 @@ func Parse(body []byte) (nodes []Node, skipped int, err error) {
 		nodes = append(nodes, n)
 	}
 	if len(nodes) == 0 {
-		return nil, skipped, errors.New("no supported nodes")
+		return nil, skipped, errNoSupportedNodes
 	}
 	return nodes, skipped, nil
 }

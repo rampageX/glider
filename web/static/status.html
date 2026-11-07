@@ -35,6 +35,7 @@
     .badge { padding:8px 14px; border-radius:999px; font-weight:700; letter-spacing:.04em; border:1px solid transparent; }
     .badge.ok { background:rgba(34,197,94,.14); color:#86efac; border-color:rgba(34,197,94,.28); }
     .badge.bad { background:rgba(239,68,68,.14); color:#fca5a5; border-color:rgba(239,68,68,.28); }
+    .badge.warn { background:rgba(245,158,11,.13); color:#fcd34d; border-color:rgba(245,158,11,.3); }
     .current-box { margin:0 0 16px; padding:14px 16px; border:1px solid rgba(56,189,248,.35); border-radius:14px; background:linear-gradient(135deg,rgba(56,189,248,.13),rgba(14,165,233,.05)); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
     .current-box.waiting { border-color:rgba(148,163,184,.25); background:rgba(148,163,184,.05); }
     .current-label { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.08em; }
@@ -119,21 +120,23 @@
       subscriptionsEl.hidden=!inputs.length;
       if(!inputs.length){subscriptionsEl.innerHTML='';return;}
       const applyLabels={PENDING:'等待首次刷新',UPDATED:'已应用新节点',UNCHANGED:'内容未变化',RETAINED_EMPTY:'筛选为空，保留现有节点',RETAINED_NO_INPUT:'订阅均失败，保留现有节点',VALIDATION_FAILED:'候选校验失败，保留现有节点',PERSIST_FAILED:'文件写入失败，保留现有节点'};
-      const failed=inputs.filter(input=>input.result==='FAILED').length;
+      const resultLabels={PENDING:'等待',SUCCESS:'成功',DOWNLOAD_FAILED:'下载失败',PARSE_FAILED:'解析失败',NO_USABLE_NODES:'无可用节点',FAILED:'处理失败'};
+      const failed=inputs.filter(input=>input.result!=='SUCCESS'&&input.result!=='PENDING').length;
       const summary=state.refreshing?'正在刷新订阅…':`${failed?`${failed} 个订阅失败 · `:''}${applyLabels[state.apply_result]||'等待刷新'}`;
       const rows=inputs.map(input=>{
         const success=input.result==='SUCCESS';
-        const badge=input.checking?'waiting':success?'ok':input.result==='FAILED'?'bad':'waiting';
-        const label=input.checking?'刷新中':success?'成功':input.result==='FAILED'?'失败':'等待';
+        const badge=input.checking?'waiting':success?'ok':input.result==='PARSE_FAILED'||input.result==='NO_USABLE_NODES'?'warn':input.result==='PENDING'?'waiting':'bad';
+        const label=input.checking?'刷新中':resultLabels[input.result]||'未知';
         const source=input.source==='cache'?'有效缓存':input.source==='download'?'联网下载':'';
-        const previous=input.checking?`<div class="subscription-note">上次结果：${success?'成功':input.result==='FAILED'?'失败':'尚无'}</div>`:'';
+        const detail=[source,input.http_status?`HTTP ${Number(input.http_status)}`:'',success||input.result==='NO_USABLE_NODES'?`匹配 ${Number(input.matched_nodes)||0} 节点`:'',input.skipped_nodes?`跳过 ${Number(input.skipped_nodes)} 节点`:''].filter(Boolean).join(' · ');
+        const previous=input.checking?`<div class="subscription-note">上次结果：${escapeHtml(resultLabels[input.result]||'未知')}</div>`:'';
         return `<tr><td><div class="node-name">订阅「${escapeHtml(input.title)}」</div><div class="subscription-url">${escapeHtml(input.url)}</div><div class="subscription-note">ID: ${escapeHtml(input.id)}</div></td>
-          <td><span class="badge ${badge}">${label}</span>${previous}<div class="subscription-note">${escapeHtml(source)}${success?` · 匹配 ${Number(input.matched_nodes)||0} 节点`:''}</div></td>
-          <td>${escapeHtml(formatTime(input.checked_at))}</td><td>${escapeHtml(formatTime(input.last_success_at))}</td></tr>`;
+          <td><span class="badge ${badge}">${label}</span>${previous}${detail?`<div class="subscription-note">${escapeHtml(detail)}</div>`:''}</td>
+          <td>${escapeHtml(formatTime(input.checked_at))}</td><td>${escapeHtml(formatTime(input.last_success_at))}${input.last_download_at?`<div class="subscription-note">最近完整下载：${escapeHtml(formatTime(input.last_download_at))}</div>`:''}</td></tr>`;
       }).join('');
       subscriptionsEl.innerHTML=`<div class="group-head"><div><h2 class="group-name">Subscriptions · 订阅</h2><div class="meta"><span>${escapeHtml(summary)}</span><span>下次刷新：${escapeHtml(formatTime(state.next_refresh_at))}</span></div></div></div>
-        <div class="table-wrap"><table><thead><tr><th>订阅 / URL（已脱敏）</th><th>最近结果</th><th>检查时间</th><th>上次成功下载</th></tr></thead><tbody>${rows}</tbody></table></div>
-        <div class="subscription-note">成功表示本次输入可用；缓存命中不代表重新下载。上次成功下载保留原下载时间，失败不会将它清空。URL 的路径及参数已隐藏。</div>`;
+        <div class="table-wrap"><table><thead><tr><th>订阅 / URL（已脱敏）</th><th>最近结果</th><th>检查时间</th><th>上次成功解析</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="subscription-note">下载失败与解析失败分别显示；HTTP 状态仅代表最近一次请求响应。缓存命中不代表重新下载；解析成功时间和最近完整下载时间分别保留。URL 的路径及参数已隐藏。</div>`;
     }
     function renderGroups(groups){
       if(!groups.length){groupsEl.innerHTML='<section class="panel empty">No forward groups found.</section>';return;}

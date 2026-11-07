@@ -176,10 +176,13 @@ type cacheEntry struct {
 func cacheKey(raw string) string { h := sha256.Sum256([]byte(raw)); return hex.EncodeToString(h[:]) }
 
 type inputResult struct {
-	nodes   []Node
-	hit     bool
-	skipped int
-	at      time.Time
+	nodes      []Node
+	hit        bool
+	skipped    int
+	at         time.Time
+	downloadAt time.Time
+	httpStatus int
+	failure    string
 }
 
 // Retain the small input interface used by existing cache tests.
@@ -206,39 +209,51 @@ func (m *Manager) fetchInput(ctx context.Context, raw string) (inputResult, erro
 			return inputResult{}, errors.New("expired cache")
 		}
 		n, s, e := Parse(entry.Body)
-		return inputResult{nodes: n, hit: true, skipped: s, at: entry.At}, e
+		return inputResult{nodes: n, hit: true, skipped: s, at: entry.At, downloadAt: entry.At}, e
 	}
 	if r, e := read(); e == nil {
 		return r, nil
 	}
 	if e := os.MkdirAll(m.conf.CacheDir, 0700); e != nil {
-		return inputResult{}, e
+		return inputResult{failure: resultFailed}, e
 	}
 	unlock, e := lock(ctx, path+".lock")
 	if e != nil {
-		return inputResult{}, e
+		return inputResult{failure: resultFailed}, e
 	}
 	defer unlock()
 	if r, e := read(); e == nil {
 		return r, nil
 	}
-	skipped := 0
+	last := inputResult{failure: resultDownloadFailed}
 	for index, r := range m.paths {
 		if ctx.Err() != nil {
-			return inputResult{}, ctx.Err()
+			last.failure = resultFailed
+			return last, ctx.Err()
 		}
 		debugf(m.conf, "input=%s route=%d via=%s stage=get-start", cacheKey(raw)[:8], index+1, routeLabel(r.definition))
-		b, e := download(ctx, raw, r, m.conf)
+		b, status, e := download(ctx, raw, r, m.conf)
+		if status != 0 {
+			last.httpStatus = status
+		}
 		if e != nil {
 			log.F("[subscription] input %s route %d GET failed", cacheKey(raw)[:8], index+1)
 			debugf(m.conf, "input=%s route=%d %s", cacheKey(raw)[:8], index+1, e.Error())
 			continue
 		}
+		last.downloadAt = time.Now()
 		n, s, e := Parse(b)
-		if s > skipped {
-			skipped = s
+		if s > last.skipped {
+			last.skipped = s
 		}
 		if e != nil {
+			if errors.Is(e, errNoSupportedNodes) {
+				if last.failure == resultDownloadFailed {
+					last.failure = resultNoUsableNodes
+				}
+			} else {
+				last.failure = resultParseFailed
+			}
 			log.F("[subscription] input %s route %d invalid/unsupported input; ignored in full", cacheKey(raw)[:8], index+1)
 			debugf(m.conf, "input=%s route=%d stage=parse-result reason=%s", cacheKey(raw)[:8], index+1, e.Error())
 			continue
@@ -248,18 +263,28 @@ func (m *Manager) fetchInput(ctx context.Context, raw string) (inputResult, erro
 			defs[i] = n[i].Forward
 		}
 		if Validate(defs) != nil {
+			last.failure = resultParseFailed
 			debugf(m.conf, "input=%s route=%d stage=forwarder-validation reason=invalid-forwarder", cacheKey(raw)[:8], index+1)
 			continue
 		}
 		entry := cacheEntry{At: time.Now(), Body: b}
 		data, e := json.Marshal(entry)
 		if e != nil {
-			return inputResult{}, e
+			last.failure = resultFailed
+			return last, e
 		}
 		if e = atomicWrite(path, data); e != nil {
-			return inputResult{}, e
+			last.failure = resultFailed
+			return last, e
 		}
-		return inputResult{nodes: n, skipped: s, at: entry.At}, nil
+		return inputResult{nodes: n, skipped: s, at: entry.At, downloadAt: entry.At, httpStatus: last.httpStatus}, nil
 	}
-	return inputResult{skipped: skipped}, errors.New("all GET routes failed")
+	switch last.failure {
+	case resultNoUsableNodes:
+		return last, errNoSupportedNodes
+	case resultParseFailed:
+		return last, errors.New("subscription parse or validation failed")
+	default:
+		return last, errors.New("all GET routes failed")
+	}
 }

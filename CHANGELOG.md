@@ -2,6 +2,12 @@
 
 All notable changes in this fork are documented here.
 
+## [0.23.1] - 2026-11-07
+
+- Accept inert v2rayN VLESS TCP exporter fields (`headerType=none`, empty `host` / `path`) without weakening rejection of non-default transports or options.
+- Distinguish download, parse, no-usable-node and local-processing failures in subscription status; show HTTP status and preserve both last complete download and last successful parse timestamps.
+- Add synthetic single-line Base64 mixed-protocol and REALITY/Vision regression tests; no private subscription URLs or credentials are stored.
+
 ## [0.23.0] - 2026-11-01
 
 - User confirmed real-device connectivity for AnyTLS, Trojan and VLESS REALITY + Vision; throughput and long-term stability remain under observation.

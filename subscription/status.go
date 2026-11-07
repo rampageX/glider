@@ -8,18 +8,30 @@ import (
 )
 
 type InputStatus struct {
-	ID            string     `json:"id"`
-	Title         string     `json:"title"`
-	URL           string     `json:"url"`
-	Result        string     `json:"result"`
-	Checking      bool       `json:"checking"`
-	Source        string     `json:"source"`
-	AttemptAt     *time.Time `json:"attempt_at,omitempty"`
-	CheckedAt     *time.Time `json:"checked_at,omitempty"`
-	LastSuccessAt *time.Time `json:"last_success_at,omitempty"`
-	MatchedNodes  int        `json:"matched_nodes"`
-	SkippedNodes  int        `json:"skipped_nodes"`
+	ID             string     `json:"id"`
+	Title          string     `json:"title"`
+	URL            string     `json:"url"`
+	Result         string     `json:"result"`
+	Checking       bool       `json:"checking"`
+	Source         string     `json:"source"`
+	HTTPStatus     int        `json:"http_status"` // last request response; 0 for no HTTP response or a cache hit
+	AttemptAt      *time.Time `json:"attempt_at,omitempty"`
+	CheckedAt      *time.Time `json:"checked_at,omitempty"`
+	LastDownloadAt *time.Time `json:"last_download_at,omitempty"` // last fully downloaded body, even if parsing failed
+	LastSuccessAt  *time.Time `json:"last_success_at,omitempty"`  // last valid parsed input
+	MatchedNodes   int        `json:"matched_nodes"`
+	SkippedNodes   int        `json:"skipped_nodes"`
 }
+
+const (
+	resultPending        = "PENDING"
+	resultSuccess        = "SUCCESS"
+	resultDownloadFailed = "DOWNLOAD_FAILED"
+	resultParseFailed    = "PARSE_FAILED"
+	resultNoUsableNodes  = "NO_USABLE_NODES"
+	resultFailed         = "FAILED" // local processing failure, not an HTTP failure
+)
+
 type Status struct {
 	Inputs          []InputStatus `json:"inputs"`
 	Refreshing      bool          `json:"refreshing"`
@@ -60,7 +72,7 @@ func (m *Manager) initStatus() {
 		if len(m.conf.Titles) > i && strings.TrimSpace(m.conf.Titles[i]) != "" {
 			title = m.conf.Titles[i]
 		}
-		m.status.Inputs[i] = InputStatus{ID: cacheKey(raw)[:12], Title: title, URL: maskedURL(raw), Result: "PENDING"}
+		m.status.Inputs[i] = InputStatus{ID: cacheKey(raw)[:12], Title: title, URL: maskedURL(raw), Result: resultPending}
 	}
 }
 func cloneTime(v *time.Time) *time.Time {
@@ -84,6 +96,7 @@ func (m *Manager) Snapshot() Status {
 	for i := range s.Inputs {
 		s.Inputs[i].AttemptAt = cloneTime(s.Inputs[i].AttemptAt)
 		s.Inputs[i].CheckedAt = cloneTime(s.Inputs[i].CheckedAt)
+		s.Inputs[i].LastDownloadAt = cloneTime(s.Inputs[i].LastDownloadAt)
 		s.Inputs[i].LastSuccessAt = cloneTime(s.Inputs[i].LastSuccessAt)
 	}
 	return s
@@ -113,6 +126,7 @@ func (m *Manager) beginInput(i int) {
 	defer m.statusMu.Unlock()
 	m.status.Inputs[i].Checking = true
 	m.status.Inputs[i].AttemptAt = &now
+	m.status.Inputs[i].HTTPStatus = 0
 }
 func (m *Manager) endInput(i int, r inputResult, err error) {
 	now := time.Now()
@@ -122,20 +136,33 @@ func (m *Manager) endInput(i int, r inputResult, err error) {
 	s.Checking = false
 	s.CheckedAt = &now
 	s.SkippedNodes = r.skipped
+	s.HTTPStatus = r.httpStatus
+	if !r.downloadAt.IsZero() {
+		s.LastDownloadAt = cloneTime(&r.downloadAt)
+	}
 	if err != nil {
-		s.Result = "FAILED"
+		s.Result = r.failure
+		if s.Result == "" {
+			s.Result = resultFailed
+		}
 		s.Source = ""
+		if !r.downloadAt.IsZero() {
+			s.Source = "download"
+		}
 		s.MatchedNodes = 0
 		m.needsRetry = true
 		return
 	}
-	s.Result = "SUCCESS"
+	s.MatchedNodes = len(m.conf.Filter(r.nodes))
+	s.Result = resultSuccess
+	if s.MatchedNodes == 0 {
+		s.Result = resultNoUsableNodes
+	}
 	s.Source = "download"
 	if r.hit {
 		s.Source = "cache"
 	}
 	s.LastSuccessAt = cloneTime(&r.at)
-	s.MatchedNodes = len(m.conf.Filter(r.nodes))
 }
 func (m *Manager) setApply(result string, retry bool) {
 	m.statusMu.Lock()

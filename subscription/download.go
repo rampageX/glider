@@ -93,16 +93,19 @@ func (d *requestBase) Dial(network, addr string) (net.Conn, error) {
 	}
 	return &requestConn{Conn: c, stop: stop}, nil
 }
-func download(ctx context.Context, raw string, r route, c Config) ([]byte, error) {
+
+// The status is zero if no HTTP response was received. It remains available
+// even when the server responds with an error status.
+func download(ctx context.Context, raw string, r route, c Config) ([]byte, int, error) {
 	u, e := url.Parse(raw)
 	if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-		return nil, errors.New("invalid subscription URL")
+		return nil, 0, errors.New("invalid subscription URL")
 	}
 	ctx, cancel := context.WithTimeout(ctx, c.duration(c.Timeout))
 	defer cancel()
 	base, e := proxy.NewDirect(r.intface, c.duration(c.ConnectTimeout), 0)
 	if e != nil {
-		return nil, errors.New("stage=dial reason=invalid-interface")
+		return nil, 0, errors.New("stage=dial reason=invalid-interface")
 	}
 	// Build with a bounded base rather than the runtime Proxy: download requests
 	// never recursively invoke subscription refresh or acquire its cache lock.
@@ -113,7 +116,7 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	for _, part := range strings.Split(chain, ",") {
 		d, e = proxy.DialerFromURL(part, d)
 		if e != nil {
-			return nil, errors.New("invalid download route")
+			return nil, 0, errors.New("invalid download route")
 		}
 	}
 	tr := &http.Transport{Proxy: nil, DisableKeepAlives: true, TLSHandshakeTimeout: c.duration(c.ConnectTimeout), ResponseHeaderTimeout: c.duration(c.Timeout), DialContext: func(_ context.Context, network, addr string) (net.Conn, error) {
@@ -138,7 +141,7 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	}}
 	req, e := http.NewRequestWithContext(ctx, http.MethodGet, raw, nil)
 	if e != nil {
-		return nil, errors.New("invalid request")
+		return nil, 0, errors.New("invalid request")
 	}
 	trace := &httptrace.ClientTrace{
 		TLSHandshakeStart: func() { debugf(c, "input=%s route=%s stage=tls-start", cacheKey(raw)[:8], routeLabel(r.definition)) },
@@ -157,20 +160,20 @@ func download(ctx context.Context, raw string, r route, c Config) ([]byte, error
 	req.Header.Set("User-Agent", "Glider-subscription/1")
 	resp, e := client.Do(req)
 	if e != nil {
-		return nil, fmt.Errorf("stage=get reason=%s", networkReason(e))
+		return nil, 0, fmt.Errorf("stage=get reason=%s", networkReason(e))
 	}
 	defer resp.Body.Close()
 	debugf(c, "input=%s route=%s stage=response status=%d media=%s declared-bytes=%d", cacheKey(raw)[:8], routeLabel(r.definition), resp.StatusCode, mediaKind(resp.Header.Get("Content-Type")), resp.ContentLength)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("stage=response status=%d", resp.StatusCode)
+		return nil, resp.StatusCode, fmt.Errorf("stage=response status=%d", resp.StatusCode)
 	}
 	b, e := io.ReadAll(io.LimitReader(resp.Body, int64(c.MaxBytes)+1))
 	if e != nil {
-		return nil, fmt.Errorf("stage=read reason=%s", networkReason(e))
+		return nil, resp.StatusCode, fmt.Errorf("stage=read reason=%s", networkReason(e))
 	}
 	if len(b) > c.MaxBytes {
-		return nil, errors.New("response limit exceeded")
+		return nil, resp.StatusCode, errors.New("response limit exceeded")
 	}
 	debugf(c, "input=%s route=%s stage=body %s", cacheKey(raw)[:8], routeLabel(r.definition), bodySummary(b))
-	return b, nil
+	return b, resp.StatusCode, nil
 }
