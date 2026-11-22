@@ -43,6 +43,8 @@ Each instance can manage its own region and output file. Multiple instances can 
 
 ### Quick start
 
+**Default values:** [Full instance configuration reference](config/subscription/instance.reference.conf.example) lists the actual defaults and units for main/subscription settings. Every option line is commented out for safe reference.
+
 Replace the placeholder URL and adjust the proxy route, paths and listeners for your deployment. This example selects names/groups containing `香港` or `日本`, excluding `遊戲`:
 
 ```ini
