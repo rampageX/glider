@@ -32,6 +32,8 @@ verbose=True
 # Default: :8888
 web=:8888
 
+# LHA history persistence. Default: true; false disables history file I/O without disabling LHA health checks.
+# lha-history-enabled=true
 # LHA probe history retention. Default: 3 local dates; 0 disables auto-cleanup.
 # lha-history-retention-days=3
 

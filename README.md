@@ -71,6 +71,8 @@ subscription-cache-ttl=1h
 subscription-retry-interval=2h
 subscription-cache-dir=/tmp/.subscription-cache
 lha-history-dir=/tmp/.glider-history
+# 如需暂时禁用 LHA 历史磁盘读写：
+# lha-history-enabled=false
 ```
 
 使用 `glider -config /path/to/glider.conf` 启动，然后在同一台机器打开 `http://127.0.0.1:8885/status`。运行用户需要对节点输出、缓存与历史目录具有写入权限。
@@ -179,6 +181,7 @@ Web 页面已嵌入二进制文件，运行时无需单独部署网页文件或 
 若需要在临时目录清理或重启后保留历史，可指定持久化基础目录：
 
 ```ini
+lha-history-enabled=true
 lha-history-dir=/var/lib/glider/history
 lha-history-retention-days=3
 ```
@@ -186,6 +189,7 @@ lha-history-retention-days=3
 相对路径以主配置文件所在目录为基准。已有历史不会自动搬迁。
 
 - 非空的 `GLIDER_LHA_HISTORY_PATH` 环境变量优先于 `lha-history-dir`，指定完整的实例历史目录；其相对路径以 Glider 工作目录为基准。多个实例使用该变量时，应分别指定不同目录。
+- `lha-history-enabled` 默认 `true`；设为 `false` 时**不创建、读取、写入或清理 LHA 历史文件**，但健康检查与 LHA 节点调度仍正常，历史页面/API 返回空统计。已有历史文件不会被删除。该开关不影响订阅缓存、其它日志或 systemd journal。
 - `lha-history-retention-days` 可在主配置或公共 `include` 中设置历史保留天数，**默认 `3` 天**；裸数字按天计算，也支持 `3d`、`1w` 等完整天数单位。设为 `0` 关闭自动清理。
 - `GLIDER_LHA_HISTORY_RETENTION_DAYS` 环境变量在值有效时优先于配置文件；无效时使用配置文件中的天数。
 
