@@ -143,7 +143,7 @@ func TestInitAvailabilityStoreAppliesRetentionSetting(t *testing.T) {
 	}
 	t.Setenv("GLIDER_LHA_HISTORY_PATH", dir)
 	t.Setenv("GLIDER_LHA_HISTORY_RETENTION_DAYS", "2")
-	if err := InitAvailabilityStore("", "test", DefaultAvailabilityRetentionDays); err != nil {
+	if err := InitAvailabilityStore("", "test", DefaultAvailabilityRetentionDays, true); err != nil {
 		t.Fatal(err)
 	}
 	defer CloseAvailabilityStore()
@@ -198,7 +198,7 @@ func TestInitAvailabilityStoreConfiguredRetentionPrecedence(t *testing.T) {
 			}
 			t.Setenv("GLIDER_LHA_HISTORY_PATH", dir)
 			t.Setenv(availabilityRetentionEnv, tc.env)
-			if err := InitAvailabilityStore("", "test", tc.configured); err != nil {
+			if err := InitAvailabilityStore("", "test", tc.configured, true); err != nil {
 				t.Fatal(err)
 			}
 			defer CloseAvailabilityStore()
@@ -208,7 +208,78 @@ func TestInitAvailabilityStoreConfiguredRetentionPrecedence(t *testing.T) {
 			}
 		})
 	}
-	if err := InitAvailabilityStore(t.TempDir(), "test", -1); err == nil {
+	if err := InitAvailabilityStore(t.TempDir(), "test", -1, true); err == nil {
 		t.Fatal("negative retention must be rejected")
+	}
+}
+
+func TestInitAvailabilityStoreDisabledDoesNotCreateOrDeleteHistory(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "history")
+	t.Setenv("GLIDER_LHA_HISTORY_PATH", dir)
+	t.Setenv(availabilityRetentionEnv, "1")
+	if err := InitAvailabilityStore("/dev/null", "test", DefaultAvailabilityRetentionDays, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("disabled mode unexpectedly created history directory: %v", err)
+	}
+	if err := RecordLHAAvailability(AvailabilitySample{At: time.Now(), Group: "main", Node: "one", Success: true}); err != nil {
+		t.Fatal(err)
+	}
+	if len(AvailabilityForDay(time.Now()).Groups) != 0 {
+		t.Fatal("disabled history should return no persisted records")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Fatalf("disabled mode unexpectedly wrote history: %v", err)
+	}
+
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	expired := filepath.Join(dir, "2000-01-01.jsonl")
+	if err := os.WriteFile(expired, []byte("old\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := InitAvailabilityStore("/dev/null", "test", DefaultAvailabilityRetentionDays, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(expired); err != nil {
+		t.Fatalf("disabled mode must not prune existing files: %v", err)
+	}
+}
+
+func TestDisableAvailabilityStoreStopsWritesAndClosesPreviousStore(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("GLIDER_LHA_HISTORY_PATH", dir)
+	t.Setenv(availabilityRetentionEnv, "3")
+	if err := InitAvailabilityStore("", "test", DefaultAvailabilityRetentionDays, true); err != nil {
+		t.Fatal(err)
+	}
+	defer CloseAvailabilityStore()
+	sample := AvailabilitySample{At: time.Now(), Group: "main", Node: "one", Success: true}
+	if err := RecordLHAAvailability(sample); err != nil {
+		t.Fatal(err)
+	}
+	historyFile := filepath.Join(dir, sample.At.In(time.Local).Format("2006-01-02")+".jsonl")
+	before, err := os.Stat(historyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := InitAvailabilityStore("", "test", DefaultAvailabilityRetentionDays, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := RecordLHAAvailability(sample); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.Stat(historyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Size() != before.Size() {
+		t.Fatalf("history file grew while disabled: before=%d after=%d", before.Size(), after.Size())
+	}
+	if len(AvailabilityForDay(sample.At).Groups) != 0 {
+		t.Fatal("disabled store must not expose old history")
 	}
 }

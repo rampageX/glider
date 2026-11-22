@@ -435,7 +435,11 @@ func availabilityHistoryDirectory(defaultDirectory, instanceID string) string {
 // InitAvailabilityStore loads persisted LHA history. The path can be overridden
 // with GLIDER_LHA_HISTORY_PATH; otherwise each instance gets a stable, separate directory.
 // Valid GLIDER_LHA_HISTORY_RETENTION_DAYS overrides configuredRetentionDays.
-func InitAvailabilityStore(defaultDirectory, instanceID string, configuredRetentionDays int) error {
+// When enabled is false, no history directory or file is accessed; any prior store is closed.
+func InitAvailabilityStore(defaultDirectory, instanceID string, configuredRetentionDays int, enabled bool) error {
+	if !enabled {
+		return CloseAvailabilityStore()
+	}
 	if configuredRetentionDays < 0 {
 		return errors.New("availability history retention days cannot be negative")
 	}

@@ -42,10 +42,12 @@ func main() {
 			log.F("[subscription] no valid snapshot; waiting for subscription (fail closed)")
 		}
 	}
-	if err := stats.InitAvailabilityStore(config.HistoryDir, lhaHistoryInstanceID(config), config.HistoryRetentionDays); err != nil {
+	if err := stats.InitAvailabilityStore(config.HistoryDir, lhaHistoryInstanceID(config), config.HistoryRetentionDays, config.HistoryEnabled); err != nil {
 		log.F("[lha-history] historical availability will not be persisted: %s", err)
-	} else {
+	} else if config.HistoryEnabled {
 		defer stats.CloseAvailabilityStore()
+	} else {
+		log.F("[lha-history] persistence disabled by lha-history-enabled=false")
 	}
 
 	pxy := rule.NewProxy(config.Forwards, &config.Strategy, config.rules)

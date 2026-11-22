@@ -39,6 +39,7 @@ type Config struct {
 	DNSConfig  dns.Config
 	Web        string
 	HistoryDir           string
+	HistoryEnabled       bool
 	HistoryRetentionDays int
 
 	rules []*rule.Config
@@ -97,6 +98,7 @@ check=disable: disable health check`)
 	flag.BoolVar(&conf.DNSConfig.NoAAAA, "dnsnoaaaa", false, "disable AAAA query")
 	flag.StringSliceUniqVar(&conf.DNSConfig.Records, "dnsrecord", nil, "custom dns record, format: domain/ip")
 	flag.StringVar(&conf.HistoryDir, "lha-history-dir", filepath.Join(os.TempDir(), ".glider-history"), "LHA history base directory (instance subdirectories; relative to main config)")
+	flag.BoolVar(&conf.HistoryEnabled, "lha-history-enabled", true, "persist LHA history; false disables history files, not LHA health checks or scheduling")
 	timevalue.DaysVar(flag, &conf.HistoryRetentionDays, "lha-history-retention-days", stats.DefaultAvailabilityRetentionDays, "LHA history retention in local dates (0 disables automatic cleanup)")
 	flag.StringVar(&conf.Web, "web", ":8888", "web admin listen address")
 
@@ -256,6 +258,7 @@ Time values:
    Examples: 60 = 1m, 2h = 7200, 1d = 24h, 1w = 7d, 1h30m = 90m.
    IMPORTANT: bare checktolerance is MILLISECONDS: 1000 = 1000ms = 1s.
    DHCP LEASE_MINUTES bare values remain minutes; lha-history-retention-days bare values are days.
+   LHA history: lha-history-enabled=false disables history file I/O.
    Example: lha-history-retention-days=3 (default), 1w=7 days, 0=keep forever.
    GLIDER_LHA_HISTORY_RETENTION_DAYS overrides the config value when valid.
    Common includes, instance configs, rule files and CLI accept suffixes.

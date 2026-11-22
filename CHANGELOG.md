@@ -2,6 +2,11 @@
 
 All notable changes in this fork are documented here.
 
+## [Unreleased]
+
+- Add `lha-history-enabled` (default `true`) in main/common config and CLI. Setting `false` disables LHA history file initialization, reads, writes and pruning, but leaves health checks and LHA routing unchanged.
+- Add disabled-mode I/O and config/CLI precedence tests, update bilingual documentation and instance reference defaults.
+
 ## [0.23.2] - 2026-11-22
 
 - Add `lha-history-retention-days` to main/common config and CLI; default to 3 local dates instead of 30. Bare values mean days and whole-day time suffixes are supported.

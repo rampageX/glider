@@ -72,3 +72,36 @@ func TestLHAHistoryRetentionDaysConfigAndOverrides(t *testing.T) {
 		})
 	}
 }
+
+func TestLHAHistoryEnabledConfigAndOverrides(t *testing.T) {
+	oldArgs, oldFlag := os.Args, flag
+	defer func() { os.Args = oldArgs; flag = oldFlag }()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "common.conf"), []byte("lha-history-enabled=false\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name, body string
+		cli        []string
+		want       bool
+	}{
+		{"default", "listen=127.0.0.1:7575\nforward=direct://\n", nil, true},
+		{"config-false", "listen=127.0.0.1:7575\nforward=direct://\nlha-history-enabled=false\n", nil, false},
+		{"common-include", "include=common.conf\nlisten=127.0.0.1:7575\nforward=direct://\n", nil, false},
+		{"cli-enables", "include=common.conf\nlisten=127.0.0.1:7575\nforward=direct://\n", []string{"-lha-history-enabled=true"}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(dir, tc.name+".conf")
+			if err := os.WriteFile(path, []byte(tc.body), 0600); err != nil {
+				t.Fatal(err)
+			}
+			flag = conflag.New("test")
+			os.Args = append([]string{"glider", "-config="+path}, tc.cli...)
+			c := parseConfig()
+			if c.HistoryEnabled != tc.want {
+				t.Fatalf("lha-history-enabled: got %t want %t", c.HistoryEnabled, tc.want)
+			}
+		})
+	}
+}

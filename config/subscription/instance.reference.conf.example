@@ -1,4 +1,4 @@
-# Glider 单实例参数参考表（v0.23.2+）
+# Glider 单实例参数参考表（持续更新；lha-history-enabled 需要 v0.23.3+）
 #
 # 用途：集中查看 glider.conf 支持的主配置/订阅参数，以及各参数在源码中的默认值。
 # 本文件故意将所有配置行注释，直接复制不会改变任何设置。
@@ -70,7 +70,10 @@
 # 默认：0 秒；不限制 relay 超时
 # relaytimeout=0
 
-# ===== 3. LHA 历史数据（v0.23.2） =====
+# ===== 3. LHA 历史数据（v0.23.3） =====
+
+# 默认：true；false 则完全不读写 LHA 历史文件、不创建历史目录；不影响健康检查和 LHA 调度
+# lha-history-enabled=true
 
 # 默认：系统临时目录/.glider-history；Linux 通常是 /tmp/.glider-history
 # 注意：这是基础目录，每个实例实际写入 glider-lha-history-<id> 子目录

@@ -71,6 +71,8 @@ subscription-cache-ttl=1h
 subscription-retry-interval=2h
 subscription-cache-dir=/tmp/.subscription-cache
 lha-history-dir=/tmp/.glider-history
+# Disable LHA history file I/O temporarily:
+# lha-history-enabled=false
 ```
 
 Run with `glider -config /path/to/glider.conf`, then open `http://127.0.0.1:8885/status` on the same machine. The process needs write access to the output, cache and history directories.
@@ -158,6 +160,7 @@ History is appended to one `YYYY-MM-DD.jsonl` file per local date. Since v0.23.0
 Set a persistent base directory when history must survive cleanup or reboot:
 
 ```ini
+lha-history-enabled=true
 lha-history-dir=/var/lib/glider/history
 lha-history-retention-days=3
 ```
@@ -165,6 +168,7 @@ lha-history-retention-days=3
 Relative `lha-history-dir` paths resolve from the main configuration directory. Existing history is not moved automatically.
 
 - `GLIDER_LHA_HISTORY_PATH`, when nonempty, takes precedence over `lha-history-dir` and specifies the full instance history directory. Relative paths are resolved from Glider's working directory. Give each instance a different path when overriding this variable.
+- `lha-history-enabled` defaults to `true`. Set it to `false` to **skip all LHA history directory/file creation, reads, writes and pruning**. Health checks and LHA routing continue; the history page/API return empty data. Existing files are not deleted. Subscription caches, other logs and systemd journal are unaffected.
 - `lha-history-retention-days` sets how many local dates to keep in the main config or a shared include. The default is **3 days**. Bare numbers mean days; full-day suffixed values such as `3d` or `1w` are accepted. Set `0` to disable automatic cleanup.
 - A valid `GLIDER_LHA_HISTORY_RETENTION_DAYS` environment variable overrides the config value; an invalid value falls back to the config.
 
