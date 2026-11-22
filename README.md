@@ -6,6 +6,14 @@
 
 本仓库基于 [nadoo/glider](https://github.com/nadoo/glider) 与 [0xec/glider](https://github.com/0xec/glider) 维护，在保留 Glider 轻量设计的基础上，增加节点名称、LHA 运行状态与历史统计，以及原生订阅管理。
 
+## v0.23.3 更新亮点
+
+- **LHA 历史可一键关闭：** 在主配置或公共 `include` 中设置 `lha-history-enabled=false`，不再创建、读取、追加或清理历史文件；旧文件原样保留。
+- **代理照常运行：** 健康检查、LHA 选路和状态页面仍然工作；只有 LHA 历史统计会暂时显示为空。
+- **完全向后兼容：** 默认 `lha-history-enabled=true`，此前的 3 天默认保留及 `lha-history-dir` 配置不变；不会影响订阅缓存、其它日志或 systemd journal。
+
+[下载 v0.23.3](https://github.com/rampageX/glider/releases/tag/v0.23.3) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.23.3/glider_0.23.3_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.23.3.md)
+
 ## v0.23.2 更新亮点
 
 - **历史默认只保留 3 天：** 由原来的 30 天缩短为 3 天，启动和日期切换时自动清理过期 `.jsonl` 文件。

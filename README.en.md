@@ -6,6 +6,14 @@ A compact multi-protocol forward proxy with flexible proxy chains, rule-based ro
 
 This repository is a maintained fork derived from [nadoo/glider](https://github.com/nadoo/glider) and [0xec/glider](https://github.com/0xec/glider). It keeps glider's lightweight design while adding practical observability for latency-based high availability (LHA) operation.
 
+## v0.23.3 highlights
+
+- **Optional LHA history persistence:** Set `lha-history-enabled=false` in the main config or common include to skip history file creation, reads, appends, and pruning. Previously saved files remain untouched.
+- **LHA still operates:** Health probes, LHA selection, proxy forwarding, and live status remain functional. Historical LHA statistics are empty while disabled.
+- **Backward compatible:** The default remains `lha-history-enabled=true`. The three-day default retention and custom directory settings remain available; other logs, systemd journal and subscription cache are unaffected.
+
+[Download v0.23.3](https://github.com/rampageX/glider/releases/tag/v0.23.3) · [N1 / Linux ARM64 package](https://github.com/rampageX/glider/releases/download/v0.23.3/glider_0.23.3_linux_arm64.tar.gz) · [Release notes](docs/releases/v0.23.3.md)
+
 ## v0.23.2 highlights
 
 - **Three-day LHA history default:** Reduced from 30 local dates; expired daily `.jsonl` files are pruned at startup and on day rollover.
