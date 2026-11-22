@@ -6,6 +6,15 @@
 
 本仓库基于 [nadoo/glider](https://github.com/nadoo/glider) 与 [0xec/glider](https://github.com/0xec/glider) 维护，在保留 Glider 轻量设计的基础上，增加节点名称、LHA 运行状态与历史统计，以及原生订阅管理。
 
+## v0.23.2 更新亮点
+
+- **历史默认只保留 3 天：** 由原来的 30 天缩短为 3 天，启动和日期切换时自动清理过期 `.jsonl` 文件。
+- **配置文件直接设置：** `lha-history-retention-days=3`，裸数字按天；也可写 `1w`，设为 `0` 则不自动清理。
+- **存储路径仍可自定义：** `lha-history-dir=/mnt/data/glider-history`，多实例自动使用独立子目录；不改变现有目录解析规则。
+- **兼容 systemd：** 原有 `GLIDER_LHA_HISTORY_RETENTION_DAYS` 环境变量仍优先于配置文件；原有 `GLIDER_LHA_HISTORY_PATH` 仍优先于目录配置。无需修改已有启动脚本。
+
+[下载 v0.23.2](https://github.com/rampageX/glider/releases/tag/v0.23.2) · [N1 / Linux ARM64 安装包](https://github.com/rampageX/glider/releases/download/v0.23.2/glider_0.23.2_linux_arm64.tar.gz) · [版本说明](docs/releases/v0.23.2.md)
+
 ## v0.23.1 更新亮点
 
 - **修复 v2rayN VLESS TCP 订阅导入：** 接受多余但无作用的 `headerType=none`、空 `host` / `path` 参数，非默认传输扩展仍严格拒绝。

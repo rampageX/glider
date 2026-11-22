@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	version = "0.23.1"
+	version = "0.23.2"
 	config  *Config
 )
 

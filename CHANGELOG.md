@@ -2,7 +2,7 @@
 
 All notable changes in this fork are documented here.
 
-## [Unreleased]
+## [0.23.2] - 2026-11-22
 
 - Add `lha-history-retention-days` to main/common config and CLI; default to 3 local dates instead of 30. Bare values mean days and whole-day time suffixes are supported.
 - Preserve `GLIDER_LHA_HISTORY_RETENTION_DAYS` environment-variable precedence, `0` to disable cleanup, and fallback to configured retention for invalid environment values.
