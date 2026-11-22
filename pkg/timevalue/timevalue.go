@@ -100,6 +100,8 @@ func Var(f *conflag.Conflag, p *int, name string, initial int, unit time.Duratio
 	if unit == time.Millisecond {
 		bare = "milliseconds"
 		suffixes = "ms/s/m/h/d/w"
+	} else if unit == 24*time.Hour {
+		bare = "days"
 	}
 	f.Var(&value{p, unit}, name, usage+"; bare: "+bare+"; suffixes: "+suffixes)
 }
@@ -108,4 +110,8 @@ func SecondsVar(f *conflag.Conflag, p *int, name string, initial int, usage stri
 }
 func MillisecondsVar(f *conflag.Conflag, p *int, name string, initial int, usage string) {
 	Var(f, p, name, initial, time.Millisecond, usage)
+}
+
+func DaysVar(f *conflag.Conflag, p *int, name string, initial int, usage string) {
+	Var(f, p, name, initial, 24*time.Hour, usage)
 }

@@ -32,6 +32,9 @@ verbose=True
 # Default: :8888
 web=:8888
 
+# LHA probe history retention. Default: 3 local dates; 0 disables auto-cleanup.
+# lha-history-retention-days=3
+
 # LISTENERS
 # ---------
 # Local listeners, we can set up multiple listeners on different port with

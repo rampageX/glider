@@ -89,7 +89,7 @@ subscription-retry-interval=2h
 
 时间单位：`s` 秒、`m` 分钟、`h` 小时、`d` 天（24 小时）、`w` 周（7 天），支持 `1h30m`。
 普通时间配置裸数字为秒；`checktolerance` 裸数字为毫秒且可用 `ms`。
-DHCP `LEASE_MINUTES` 裸数字仍为分钟，历史保留 `GLIDER_LHA_HISTORY_RETENTION_DAYS` 裸数字仍为天。
+DHCP `LEASE_MINUTES` 裸数字仍为分钟，`lha-history-retention-days` 和 `GLIDER_LHA_HISTORY_RETENTION_DAYS` 裸数字仍为天。
 主配置、common include、规则文件和命令行都支持时间后缀；数值必须符合原字段的精度，不能表示为整数秒的普通配置会报错。
 
 协议筛选与区域关键词同时生效，重启恢复快照时也会过滤。它**只限制订阅节点**，不影响手写 `forward=`、旧节点 include 或独立规则组；专门测协议时请移开这些额外节点和分流规则。修改配置后重启实例，普通订阅更新仍可自动应用。
@@ -169,12 +169,14 @@ Web 页面已嵌入二进制文件，运行时无需单独部署网页文件或 
 
 ```ini
 lha-history-dir=/var/lib/glider/history
+lha-history-retention-days=3
 ```
 
 相对路径以主配置文件所在目录为基准。已有历史不会自动搬迁。
 
 - 非空的 `GLIDER_LHA_HISTORY_PATH` 环境变量优先于 `lha-history-dir`，指定完整的实例历史目录；其相对路径以 Glider 工作目录为基准。多个实例使用该变量时，应分别指定不同目录。
-- `GLIDER_LHA_HISTORY_RETENTION_DAYS` 设置保留的本地日期数量，默认 `30`；设为 `0` 关闭自动清理。
+- `lha-history-retention-days` 可在主配置或公共 `include` 中设置历史保留天数，**默认 `3` 天**；裸数字按天计算，也支持 `3d`、`1w` 等完整天数单位。设为 `0` 关闭自动清理。
+- `GLIDER_LHA_HISTORY_RETENTION_DAYS` 环境变量在值有效时优先于配置文件；无效时使用配置文件中的天数。
 
 启动及打开新一天的历史文件时，会清理过期日期文件。仅清理文件名为 `YYYY-MM-DD.jsonl` 的普通文件。
 
