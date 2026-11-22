@@ -143,7 +143,7 @@ func TestInitAvailabilityStoreAppliesRetentionSetting(t *testing.T) {
 	}
 	t.Setenv("GLIDER_LHA_HISTORY_PATH", dir)
 	t.Setenv("GLIDER_LHA_HISTORY_RETENTION_DAYS", "2")
-	if err := InitAvailabilityStore("", "test"); err != nil {
+	if err := InitAvailabilityStore("", "test", DefaultAvailabilityRetentionDays); err != nil {
 		t.Fatal(err)
 	}
 	defer CloseAvailabilityStore()
@@ -169,5 +169,46 @@ func TestAvailabilityStorePrunesAtDayRollover(t *testing.T) {
 	}
 	if _, err := os.Stat(oldFile); !os.IsNotExist(err) {
 		t.Fatalf("day rollover should remove expired history: %v", err)
+	}
+}
+
+func TestInitAvailabilityStoreConfiguredRetentionPrecedence(t *testing.T) {
+	if DefaultAvailabilityRetentionDays != 3 {
+		t.Fatalf("unexpected default LHA history retention: %d", DefaultAvailabilityRetentionDays)
+	}
+	cases := []struct {
+		name       string
+		configured int
+		env        string
+		keepOld    bool
+	}{
+		{"config-one-day", 1, "", false},
+		{"config-default-three-days", DefaultAvailabilityRetentionDays, "", false},
+		{"config-zero-disables-cleanup", 0, "", true},
+		{"env-overrides-zero-config", 0, "2", false},
+		{"env-zero-overrides-config", 1, "0", true},
+		{"invalid-env-falls-back-to-config", 1, "invalid", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			oldFile := filepath.Join(dir, "2000-01-01.jsonl")
+			if err := os.WriteFile(oldFile, []byte("old\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("GLIDER_LHA_HISTORY_PATH", dir)
+			t.Setenv(availabilityRetentionEnv, tc.env)
+			if err := InitAvailabilityStore("", "test", tc.configured); err != nil {
+				t.Fatal(err)
+			}
+			defer CloseAvailabilityStore()
+			_, err := os.Stat(oldFile)
+			if (err == nil) != tc.keepOld {
+				t.Fatalf("configured=%d env=%q keepOld=%v: stat err=%v", tc.configured, tc.env, tc.keepOld, err)
+			}
+		})
+	}
+	if err := InitAvailabilityStore(t.TempDir(), "test", -1); err == nil {
+		t.Fatal("negative retention must be rejected")
 	}
 }

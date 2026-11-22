@@ -41,3 +41,34 @@ func TestDurationUnitsInCommonAndRuleConfigs(t *testing.T) {
 		t.Fatal("rule config durations incorrect", err)
 	}
 }
+
+func TestLHAHistoryRetentionDaysConfigAndOverrides(t *testing.T) {
+	oldArgs, oldFlag := os.Args, flag
+	defer func() { os.Args = oldArgs; flag = oldFlag }()
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "common.conf"), []byte("lha-history-retention-days=1w\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name, body string
+		cli        []string
+		want       int
+	}{
+		{"default", "listen=127.0.0.1:7575\nforward=direct://\n", nil, 3},
+		{"config-file", "listen=127.0.0.1:7575\nforward=direct://\nlha-history-retention-days=2d\n", nil, 2},
+		{"included-config", "include=common.conf\nlisten=127.0.0.1:7575\nforward=direct://\n", nil, 7},
+		{"command-line-override", "include=common.conf\nlisten=127.0.0.1:7575\nforward=direct://\n", []string{"-lha-history-retention-days=0"}, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(dir, tc.name+".conf")
+			if err := os.WriteFile(path, []byte(tc.body), 0600); err != nil { t.Fatal(err) }
+			flag = conflag.New("test")
+			os.Args = append([]string{"glider", "-config="+path}, tc.cli...)
+			conf := parseConfig()
+			if conf.HistoryRetentionDays != tc.want {
+				t.Fatalf("lha-history-retention-days: got %d want %d", conf.HistoryRetentionDays, tc.want)
+			}
+		})
+	}
+}

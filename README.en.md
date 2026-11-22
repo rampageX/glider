@@ -148,12 +148,14 @@ Set a persistent base directory when history must survive cleanup or reboot:
 
 ```ini
 lha-history-dir=/var/lib/glider/history
+lha-history-retention-days=3
 ```
 
 Relative `lha-history-dir` paths resolve from the main configuration directory. Existing history is not moved automatically.
 
 - `GLIDER_LHA_HISTORY_PATH`, when nonempty, takes precedence over `lha-history-dir` and specifies the full instance history directory. Relative paths are resolved from Glider's working directory. Give each instance a different path when overriding this variable.
-- `GLIDER_LHA_HISTORY_RETENTION_DAYS` sets how many local dates to keep. The default is `30`; set it to `0` to disable automatic cleanup.
+- `lha-history-retention-days` sets how many local dates to keep in the main config or a shared include. The default is **3 days**. Bare numbers mean days; full-day suffixed values such as `3d` or `1w` are accepted. Set `0` to disable automatic cleanup.
+- A valid `GLIDER_LHA_HISTORY_RETENTION_DAYS` environment variable overrides the config value; an invalid value falls back to the config.
 
 Expired date files are removed at startup and when a new day's history file is opened. Cleanup only targets regular files named `YYYY-MM-DD.jsonl`.
 

@@ -2,6 +2,12 @@
 
 All notable changes in this fork are documented here.
 
+## [Unreleased]
+
+- Add `lha-history-retention-days` to main/common config and CLI; default to 3 local dates instead of 30. Bare values mean days and whole-day time suffixes are supported.
+- Preserve `GLIDER_LHA_HISTORY_RETENTION_DAYS` environment-variable precedence, `0` to disable cleanup, and fallback to configured retention for invalid environment values.
+- Add config precedence and retention-pruning regression coverage. Existing 0.21 release notes retain their historical defaults.
+
 ## [0.23.1] - 2026-11-07
 
 - Accept inert v2rayN VLESS TCP exporter fields (`headerType=none`, empty `host` / `path`) without weakening rejection of non-default transports or options.

@@ -18,7 +18,7 @@ import (
 
 const (
 	AvailabilityBucketMinutes        = 15
-	DefaultAvailabilityRetentionDays = 30
+	DefaultAvailabilityRetentionDays = 3
 	availabilityRetentionEnv         = "GLIDER_LHA_HISTORY_RETENTION_DAYS"
 )
 
@@ -434,7 +434,11 @@ func availabilityHistoryDirectory(defaultDirectory, instanceID string) string {
 
 // InitAvailabilityStore loads persisted LHA history. The path can be overridden
 // with GLIDER_LHA_HISTORY_PATH; otherwise each instance gets a stable, separate directory.
-func InitAvailabilityStore(defaultDirectory, instanceID string) error {
+// Valid GLIDER_LHA_HISTORY_RETENTION_DAYS overrides configuredRetentionDays.
+func InitAvailabilityStore(defaultDirectory, instanceID string, configuredRetentionDays int) error {
+	if configuredRetentionDays < 0 {
+		return errors.New("availability history retention days cannot be negative")
+	}
 	path := strings.TrimSpace(os.Getenv("GLIDER_LHA_HISTORY_PATH"))
 	if path == "" {
 		if strings.TrimSpace(defaultDirectory) == "" {
@@ -442,11 +446,11 @@ func InitAvailabilityStore(defaultDirectory, instanceID string) error {
 		}
 		path = availabilityHistoryDirectory(defaultDirectory, instanceID)
 	}
-	retentionDays := DefaultAvailabilityRetentionDays
+	retentionDays := configuredRetentionDays
 	if raw := strings.TrimSpace(os.Getenv(availabilityRetentionEnv)); raw != "" {
 		days, err := timevalue.Int(raw, 24*time.Hour)
 		if err != nil || days < 0 {
-			log.Printf("[lha-history] invalid %s value %q; using the default of %d days", availabilityRetentionEnv, raw, DefaultAvailabilityRetentionDays)
+			log.Printf("[lha-history] invalid %s value %q; using the configured value of %d days", availabilityRetentionEnv, raw, configuredRetentionDays)
 		} else {
 			retentionDays = days
 		}
