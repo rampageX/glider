@@ -1,0 +1,183 @@
+# Glider 单实例参数参考表（v0.23.2+）
+#
+# 用途：集中查看 glider.conf 支持的主配置/订阅参数，以及各参数在源码中的默认值。
+# 本文件故意将所有配置行注释，直接复制不会改变任何设置。
+# 真正启用某个参数时，移除配置行开头的 "# "，按需修改值。
+#
+# 重要：Glider 不支持行尾 "# 默认：..." 这种注释！
+# 正式配置必须独占一行；示例中的 "#expect=..." 和 "#priority=..." 是 URL 的一部分。
+# “默认：未设置”表示程序不主动启用该功能。
+# 裸数字通常按秒；checktolerance 按毫秒；lha-history-retention-days 按天。
+
+# ===== 1. 公共配置 / 实例标识 =====
+
+# 默认：不读取其它文件；公共配置建议放在此处
+# include=subscription-common.conf
+
+# 默认：false；开启详细日志
+# verbose=false
+
+# 默认：19；Go 日志输出标志，不熟悉时不要改
+# logflags=19
+
+# 默认：32768 字节
+# tcpbufsize=32768
+
+# 默认：2048 字节
+# udpbufsize=2048
+
+# 默认：未设置；至少配置 listen/dns/service 之一
+# listen=:7575
+
+# 默认：:8888；Web Status / LHA / Traffic / Logs 监听地址
+# web=:8888
+
+# 默认：未设置；手工静态转发可重复（订阅管理的节点不要重复 include）
+# forward=socks5://127.0.0.1:1080
+
+# 默认：未设置；指定全局出口 IP 或网卡名
+# interface=eth0
+
+# ===== 2. 转发策略和健康检查 =====
+
+# 默认：rr；可选 rr/ha/lha/dh
+# strategy=rr
+
+# 默认：http://www.msftconnecttest.com/connecttest.txt#expect=200
+# check=http://www.msftconnecttest.com/connecttest.txt#expect=200
+
+# 默认：30 秒；支持 30、30s、1m 等写法
+# checkinterval=30
+
+# 默认：10 秒
+# checktimeout=10
+
+# 默认：0 毫秒！裸数字按毫秒，1000 相当于 1s
+# checktolerance=0
+
+# 默认：10 次健康检查样本
+# checklatencysamples=10
+
+# 默认：false；只探测不可用节点
+# checkdisabledonly=false
+
+# 默认：3 次失败
+# maxfailures=3
+
+# 默认：3 秒；转发连接超时
+# dialtimeout=3
+
+# 默认：0 秒；不限制 relay 超时
+# relaytimeout=0
+
+# ===== 3. LHA 历史数据（v0.23.2） =====
+
+# 默认：系统临时目录/.glider-history；Linux 通常是 /tmp/.glider-history
+# 注意：这是基础目录，每个实例实际写入 glider-lha-history-<id> 子目录
+# lha-history-dir=/tmp/.glider-history
+
+# 默认：3 天；裸数字按天；支持 3d、1w；0=不自动清理
+# 清理时机：启动和跨入新的一天；仅删除过期 YYYY-MM-DD.jsonl 普通文件
+# lha-history-retention-days=3
+
+# 环境变量 GLIDER_LHA_HISTORY_PATH 非空时覆盖历史数据路径
+# 环境变量 GLIDER_LHA_HISTORY_RETENTION_DAYS 有效时覆盖保留天数
+# 注意：这两个环境变量不是 glider.conf 参数，不要写成配置键
+
+# ===== 4. 原生订阅管理（无订阅时整个分组均无需配置） =====
+
+# 默认：未设置；每个订阅 URL 对应一个标题，标题项与 URL 项数量须一致
+# subscription-title=订阅一
+
+# 默认：未设置；可重复填写多个订阅 URL
+# subscription=https://subscription.example.invalid/REPLACE_TOKEN
+
+# 默认：不过滤协议；可重复或逗号分隔：ss/ssr/anytls/trojan/vless
+# subscription-protocol=vless
+
+# 默认：未设置；区域名称仅用于识别
+# subscription-region=asia
+
+# 默认：未设置；匹配名称/分组中的关键词，可重复，多个条件取 OR
+# subscription-match=香港
+
+# 默认：遊戲；过滤包含关键词的节点；空值可取消默认过滤
+# subscription-exclude=遊戲
+
+# 默认：未设置；启用订阅时必填，自动保存/恢复成功解析的节点
+# 注意：不要再用 include= 载入同一个文件
+# subscription-output=/root/cfg/glider_db_asia_ssr.conf
+
+# 默认：系统临时目录/.subscription-cache；多个实例可共享
+# subscription-cache-dir=/tmp/.subscription-cache
+
+# 默认：3600 秒（1h）；定期刷新
+# subscription-interval=1h
+
+# 默认：3600 秒（1h）；原始订阅缓存有效期
+# subscription-cache-ttl=1h
+
+# 默认：7200 秒（2h）；刷新失败后额外重试；0=不额外重试
+# subscription-retry-interval=2h
+
+# 默认：3 秒；下载时连接/握手超时
+# subscription-connect-timeout=3
+
+# 默认：15 秒；每条订阅下载路径的总超时
+# subscription-timeout=15
+
+# 默认：8388608 字节（8 MiB）；最大 HTTP 响应正文长度
+# subscription-max-bytes=8388608
+
+# 默认：direct://；可重复，#priority 数字越大优先级越高
+# subscription-proxy=direct://#priority=100
+# subscription-proxy=socks5h://127.0.0.1:1080#priority=90
+
+# ===== 5. DNS 转发（除 dnsserver 外，其余功能默认不启用） =====
+
+# 默认：未设置；配置监听地址才启用 DNS 服务
+# dns=:53
+
+# 默认：8.8.8.8:53；配置多个 dnsserver 时按顺序使用
+# dnsserver=8.8.8.8:53
+
+# 默认：false；不管是否经代理都强制 TCP 查询上游
+# dnsalwaystcp=false
+
+# 默认：3 秒
+# dnstimeout=3
+
+# 默认：1800 秒
+# dnsmaxttl=1800
+
+# 默认：0 秒
+# dnsminttl=0
+
+# 默认：4096 个 DNS 缓存条目
+# dnscachesize=4096
+
+# 默认：false；是否记录 DNS 缓存查询日志
+# dnscachelog=false
+
+# 默认：false；是否禁用 AAAA 查询
+# dnsnoaaaa=false
+
+# 默认：未设置；静态 DNS 记录，可重复
+# dnsrecord=example.test/192.0.2.1
+
+# ===== 6. 规则文件 / 其它服务 =====
+
+# 默认：未设置；加载单个规则文件，可重复
+# rulefile=office.rule
+
+# 默认：未设置；自动加载目录下的 *.rule
+# rules-dir=rules.d
+
+# 默认：未设置；如 DHCP 服务，需要明确启用
+# service=dhcpd,eth1,192.168.1.100,192.168.1.199,720
+
+# ===== 使用建议 =====
+# 多个区域实例：把订阅 URL / 下载代理 / 历史基础目录放到 common.conf；
+# 把 listen / web / strategy / subscription-region / subscription-output / subscription-match
+# 放到各实例自己的 glider.conf，避免端口和节点文件冲突。
+# 加入新参数时：同步更新本参考表、glider -h、README 和必要的回归测试。
